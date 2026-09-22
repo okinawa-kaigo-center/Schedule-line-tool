@@ -1,0 +1,1769 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>スケジュール作成＆LINE送信ツール｜沖縄介護センター</title>
+<meta name="theme-color" content="#0B4F6C">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+:root{
+  --bg:#E9EDEE; --card:#FFFFFF; --ink:#16262B; --muted:#67797F;
+  --line:#DDE4E6; --accent:#0E5A61; --green:#06C755; --green-dk:#04A045;
+  --warn:#C2410C; --warn-bg:#FFF3E6; --warn-br:#F3C18E;
+  --bubble:#E3F6E9; --bubble-br:#BFE7CD;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"BIZ UDPGothic","Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
+  font-size:16px; line-height:1.5; -webkit-text-size-adjust:100%;
+  padding-bottom:calc(48px + env(safe-area-inset-bottom));
+}
+.wrap{max-width:620px;margin:0 auto;padding:0 12px}
+
+header{background:var(--accent);color:#fff;padding:calc(14px + env(safe-area-inset-top)) 0 15px}
+header .wrap{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.htitle{font-size:17px;font-weight:700;letter-spacing:.01em}
+.horg{font-size:12.5px;opacity:.75}
+@media(max-width:400px){.htitle{font-size:15px}}
+}
+.hprog{width:100%;margin-top:12px}
+.hprog .bar{height:5px;border-radius:99px;background:rgba(255,255,255,.22);overflow:hidden}
+.hprog .bar i{display:block;height:100%;background:#7BE8A6;border-radius:99px;transition:width .35s ease}
+.hprog .lbl{display:flex;justify-content:space-between;margin-top:7px;font-size:12.5px;opacity:.9;font-variant-numeric:tabular-nums}
+@media(prefers-reduced-motion:reduce){.hprog .bar i{transition:none}}
+
+.drop{margin:18px 0 0;padding:26px 16px;background:var(--card);border:2px dashed #B7C4CC;border-radius:12px;text-align:center}
+.drop.over{border-color:var(--accent);background:#E9F1F5}
+.drop p{margin:0 0 14px;font-size:15px;color:var(--muted);line-height:1.8}
+.pick{display:inline-block;padding:14px 28px;background:var(--accent);color:#fff;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer}
+.pick:active{opacity:.8}
+input[type=file]{position:absolute;width:1px;height:1px;opacity:0}
+
+.tally{display:flex;gap:7px;flex-wrap:wrap;margin:16px 2px 12px;font-size:12.5px}
+.tally i{font-style:normal;padding:4px 11px;border-radius:99px;background:#DDE4E6;color:var(--muted)}
+.tally i.w{background:var(--warn-bg);color:var(--warn);font-weight:700}
+.tally i.n{background:#DCEDEE;color:var(--accent);font-weight:700}
+
+.row{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin-bottom:6px}
+.row.open{padding-bottom:12px;box-shadow:0 1px 0 rgba(20,40,45,.05)}
+.row.done{background:#F4F7F7;border-color:#E4EAEB}
+.row.done .nm{color:#7B8B92;font-weight:400}
+.row.off{background:#F2F4F5;border-color:#E2E8EB;padding:6px 10px;margin-bottom:5px}
+.row.off .rhead{cursor:default;min-height:28px}
+.row.off .nm{color:#93A2AB;font-weight:400}
+.pick2{flex:0 0 auto;width:20px;height:20px;margin:0 2px 0 0;accent-color:var(--accent)}
+.row.chg{border-color:var(--warn-br);background:#FFFCF7}
+.rhead{display:flex;align-items:center;gap:7px;cursor:pointer;min-height:34px}
+.row.open .rhead{margin-bottom:9px}
+.nm{font-size:16px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto}
+.chev{flex:0 0 auto;color:#9AAAB3;font-size:12px;width:12px;text-align:center}
+.carmini{
+  flex:0 1 auto;min-width:52px;max-width:118px;padding:5px 4px;
+  border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink);
+  font-family:inherit;font-size:13px;cursor:pointer;
+  text-overflow:ellipsis;
+}
+.row.done .carmini{background:#FBFCFC}
+.carmini.dup,.carline select.dup{border-color:#C0504D;background:#FDECEC;color:#8A2222;font-weight:700}
+.go{flex:0 0 auto;padding:7px 13px;border:none;border-radius:8px;background:var(--green);color:#fff;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:0 1px 0 var(--green-dk)}
+.go.warn{background:var(--warn)}
+.go.quiet{background:#fff;color:var(--muted);border:1px solid var(--line);font-weight:400}
+.go:active{opacity:.75}
+
+.tag{font-size:11px;font-weight:700;padding:2px 7px;border-radius:99px;flex:0 0 auto}
+.tag.ok{background:#E4F3E9;color:#1B8A4B}
+.tag.chg{background:var(--warn-bg);color:var(--warn)}
+.cnt{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;margin-left:auto;white-space:nowrap;flex:0 0 auto}
+@media(max-width:400px){.cnt{display:none}}
+
+.ucrow{display:flex;align-items:center;gap:8px;margin-top:7px}
+.ucrow span{flex:1;min-width:0;font-size:13px}
+.ucrow button{flex:0 0 auto;padding:6px 11px;border:1px solid #D9BCE6;border-radius:7px;background:#fff;color:#5B2A73;font-family:inherit;font-size:12.5px;cursor:pointer}
+.ucrow button.on{background:#5B2A73;border-color:#5B2A73;color:#fff;font-weight:700}
+.ucrow button.on::after{content:"（押すと解除）";font-weight:400;font-size:11px;opacity:.75}
+.uc{margin:0 0 10px;padding:9px 11px;border-radius:8px;background:#F6ECFA;border:1px solid #D9BCE6;color:#5B2A73;font-size:13.5px;line-height:1.7;white-space:pre-line}
+.ov{margin:0 0 10px;padding:9px 11px;border-radius:8px;background:#FDECEC;border:1px solid #F0B8B8;color:#8A2222;font-size:13.5px;line-height:1.7;white-space:pre-line}
+.diff{
+  margin:0 0 8px;padding:8px 10px;border-radius:8px;
+  background:var(--warn-bg);border:1px solid var(--warn-br);
+  font-size:13.5px;line-height:1.75;color:#6B3410;white-space:pre-line;
+}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+.btn{flex:1 1 0;min-width:110px;padding:12px 8px;border-radius:9px;border:none;font-family:inherit;font-size:15px;font-weight:700;cursor:pointer}
+.btn.share{background:var(--green);color:#fff}
+.btn.warn{background:var(--warn);color:#fff}
+.btn.copy{background:#fff;color:var(--accent);border:1.5px solid var(--accent)}
+.btn.quiet{background:#fff;color:var(--muted);border:1.5px solid var(--line);font-weight:400}
+.btn.peek{flex:0 0 auto;min-width:0;background:#fff;color:var(--muted);border:1.5px solid var(--line);padding:12px 14px}
+.btn:active{opacity:.75}
+
+.carline{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #EEF1F3}
+.carline span{flex:1;min-width:0;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.carline select{flex:0 0 auto;width:130px;padding:8px 6px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:14px;background:#fff;color:var(--ink)}
+
+.manual{margin-top:9px}
+.mtoggle{background:none;border:none;padding:4px 0;font-family:inherit;font-size:13.5px;color:var(--accent);cursor:pointer}
+.mbox{margin-top:6px;padding:9px;background:#F7F9FA;border:1px solid var(--line);border-radius:8px}
+.mitem{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:14px;border-bottom:1px dashed var(--line)}
+.mitem b{flex:0 0 auto;font-size:12px;padding:2px 8px;border-radius:99px;background:var(--warn-bg);color:var(--warn)}
+.mitem span{flex:1;min-width:0;word-break:break-all}
+.mitem button{flex:0 0 auto;background:none;border:none;color:var(--muted);font-size:16px;padding:2px 6px;cursor:pointer}
+.mrow{display:flex;gap:6px;margin-top:8px}
+.mrow2{display:flex;gap:6px;margin-top:6px}
+.nblock{margin-top:10px}
+.nhead{display:flex;align-items:center;margin-bottom:4px}
+.nhead span{flex:1;font-size:12.5px;color:var(--muted);font-weight:700}
+.nhead button{background:none;border:none;color:var(--muted);font-size:16px;padding:2px 6px;cursor:pointer}
+.clearbtn{display:block;width:100%;margin-top:10px;padding:11px;background:#fff;border:1px solid #E4B9B9;border-radius:9px;color:#8A2222;font-family:inherit;font-size:14px;cursor:pointer}
+.clearbtn.quiet{border-color:var(--line);color:var(--muted)}
+@media(hover:hover){.clearbtn:hover{background:#FBEAEA}.clearbtn.quiet:hover{background:#EDF1F3}}
+.naddbtn{display:block;width:100%;margin-top:10px;padding:11px;background:#fff;border:1px dashed #B7C4CC;border-radius:9px;color:var(--accent);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.notearea{width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:14.5px;line-height:1.7;color:var(--ink);background:#fff;resize:vertical}
+.mnote{margin-top:6px;font-size:12.5px;color:var(--muted);line-height:1.6}
+.mrow2 input,.mrow2 select{flex:1;min-width:0;padding:9px 10px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:14px;background:#fff;color:var(--ink)}
+.mkind{flex:1}
+.mrow select{padding:9px 6px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:14px;background:#fff;color:var(--ink)}
+.mrow input{flex:1;min-width:0;padding:9px 10px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:14px}
+.mrow button{flex:0 0 auto;padding:9px 14px;border:none;border-radius:8px;background:var(--accent);color:#fff;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.prevwrap{display:none}
+.row.showprev .prevwrap{display:block}
+textarea.prev{
+  display:block;width:100%;margin:10px 0 0 auto;padding:12px 14px;max-width:92%;
+  background:var(--bubble);border:1px solid var(--bubble-br);
+  border-radius:16px 16px 4px 16px;
+  font-family:inherit;font-size:14.5px;line-height:1.8;
+  color:#1B3A28;resize:vertical;box-sizing:border-box;
+}
+.editnote{margin-top:7px;font-size:12.5px;color:var(--warn);line-height:1.7}
+.editnote button{margin-left:8px;padding:5px 11px;border:1px solid var(--warn-br);border-radius:7px;background:#fff;color:var(--warn);font-family:inherit;font-size:12.5px;cursor:pointer}
+.tag.ed{background:var(--warn-bg);color:var(--warn)}
+
+
+.tools{display:flex;gap:8px;margin:14px 0 0;flex-wrap:wrap}
+.tools button{
+  flex:1;min-width:130px;padding:12px;background:var(--card);
+  border:1px solid var(--line);border-radius:9px;color:var(--muted);
+  font-family:inherit;font-size:14px;cursor:pointer;
+  transition:background-color .12s, border-color .12s, color .12s;
+}
+@media(hover:hover){
+  .tools button:hover{background:#E3EDF2;border-color:var(--accent);color:var(--accent)}
+  .tools button.danger:hover{background:#FBEAEA;border-color:#C0504D;color:#8A2222}
+  .bulk button:hover{background:#E3EDF2;border-color:var(--accent)}
+  .naddbtn:hover{background:#E3EDF2;border-color:var(--accent)}
+  .btn.copy:hover{background:#E3EDF2}
+  .btn.peek:hover{background:#EDF1F3;color:var(--ink)}
+  .btn.quiet:hover{background:#EDF1F3;color:var(--ink)}
+  .go:hover{filter:brightness(1.08)}
+  .go.quiet:hover{background:#EDF1F3;color:var(--ink)}
+  .mtoggle:hover{text-decoration:underline}
+  .mitem button:hover{color:#8A2222}
+  .nhead button:hover{color:#8A2222}
+  .dlbtn:hover{filter:brightness(.94)}
+  .pick:hover{filter:brightness(1.12)}
+  .staff:hover{background:#F1F5F7}
+}
+.tools button:active{background:#D8E4EA}
+.bulk button,.naddbtn,.tools button,.btn,.go{transition:background-color .12s, border-color .12s, color .12s}
+.err{background:#FDECEC;border:1px solid #F0B8B8;color:#8A2222;border-radius:10px;padding:14px;margin-top:16px;font-size:14.5px;line-height:1.7}
+.err b{display:block;margin-bottom:5px;font-size:15.5px}
+.hint{background:#E9F1F5;border:1px solid #BBD3E0;color:#134B66;border-radius:10px;padding:12px 14px;margin:0 0 14px;font-size:13.5px;line-height:1.8}
+.bulk{display:flex;align-items:center;gap:8px;margin:0 0 10px}
+.bulk span{font-size:13px;color:var(--muted);flex:0 0 auto}
+.bulk button{flex:1;padding:9px 6px;background:var(--card);border:1px solid var(--line);border-radius:8px;color:var(--accent);font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer}
+.bulk button:active{opacity:.7}
+.closing{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin:0 0 14px}
+.closing .clabel{font-size:13px;color:var(--muted);margin-bottom:9px;line-height:1.7}
+.closing .cf{display:flex;align-items:center;gap:9px;margin-bottom:7px}
+.closing .cf:last-child{margin-bottom:0}
+.closing .cf span{flex:0 0 auto;width:38px;font-size:13px;color:var(--muted)}
+.closing .cgrp{font-size:13px;font-weight:700;color:var(--accent);margin:12px 0 6px}
+.closing .cgrp:first-of-type{margin-top:4px}
+.closing .cf input{flex:1;min-width:0;padding:10px 11px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:14.5px;color:var(--ink);background:#fff}
+.foot{margin:22px 2px 0;font-size:12.5px;color:var(--muted);line-height:1.8}
+.dlbar{
+  display:none;position:fixed;left:0;right:0;bottom:0;z-index:30;
+  align-items:center;gap:8px;padding:12px 12px calc(12px + env(safe-area-inset-bottom));
+  background:var(--accent);color:#fff;box-shadow:0 -2px 12px rgba(0,0,0,.18);
+}
+.dlmsg{flex:1;min-width:0;font-size:14px}
+.dlbtn{
+  flex:0 0 auto;padding:11px 18px;border-radius:9px;border:none;
+  background:#fff;color:var(--accent);font-family:inherit;font-size:15px;font-weight:700;
+  text-decoration:none;cursor:pointer;
+}
+.dlbtn.alt{background:rgba(255,255,255,.18);color:#fff;border:1px solid rgba(255,255,255,.5)}
+.dlbtn:active{opacity:.8}
+.dlx{flex:0 0 auto;background:none;border:none;color:#fff;font-size:17px;padding:6px 4px;cursor:pointer;opacity:.8}
+.toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%) translateY(20px);background:#14212B;color:#fff;padding:11px 20px;border-radius:99px;font-size:14.5px;opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:20;max-width:88vw;text-align:center}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+@media(prefers-reduced-motion:reduce){.toast{transition:none}}
+button:focus-visible,input:focus-visible,label:focus-within{outline:3px solid #F2A93B;outline-offset:2px}
+</style>
+</head>
+<body>
+
+<header><div class="wrap">
+  <span class="htitle">スケジュール作成＆LINE送信ツール</span>
+  <span class="horg">沖縄介護センター</span>
+</div></header>
+
+<div class="wrap">
+  <div class="drop" id="drop">
+    <p>介護ソフトから書き出したExcelを選んでください。<br>
+    予定が変わったら、出し直したExcelをもう一度読ませると変更点を拾い出します。</p>
+    <label class="pick" tabindex="0">
+      Excelファイルを選ぶ
+      <input type="file" id="file" accept=".xlsx,.xls,.csv">
+    </label>
+  </div>
+  <div id="out"></div>
+  <p class="foot">
+    ファイルはこの端末の中だけで処理され、どこにも送信されません。<br>
+    送信の記録もこの端末に残ります。
+  </p>
+</div>
+
+<datalist id="svclist"></datalist>
+<div class="toast" id="toast"></div>
+
+<script>
+const TIME = /^\s*\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}\s*$/;
+let STAFF=[], DAY="", KEYDAY="", DATEOBJ=null, BASE={}, MAN={};
+const MANOPEN = {}, MANFORM = {}, ROWOPEN = {}, MANSEL = {}, MANTIME = {}, PREVCLOSED = {};
+let TPLOPEN = false, NOTEOPEN = false, CAROPEN = false;
+let SKIP = {}, RAW = null, ROW0 = 0, NOTES = [], CAR = {}, PAIR = {}, EDIT = {};
+let HOMENAMES = [];
+let CARLIST = ["A","Si","Sz","Noa","Hj","Hj2","Hj3","T1","T2","T3","T5","T6","T7","T8","イース（白）","イース（黄）","-"];
+const DOW=["日","月","火","水","木","金","土"];
+let TPL = {
+  normalHead:"{いつ}（{日付}）の連絡です。",
+  normalFoot:"よろしくお願い致します。",
+  changeHead:"{いつ}（{日付}）の変更連絡です。",
+  changeFoot:"以上、変更追加よろしいでしょうか？"
+};
+
+var IS_MOBILE = (function(){
+  try{
+    if(navigator.userAgentData && typeof navigator.userAgentData.mobile === "boolean")
+      return navigator.userAgentData.mobile;
+  }catch(e){}
+  var ua = navigator.userAgent || "";
+  if(/Android|iPhone|iPod/i.test(ua)) return true;
+  if(/iPad/i.test(ua)) return true;
+  // iPadOS は Macintosh を名乗るので、指で触れる端末かどうかで判断する
+  if(/Macintosh/i.test(ua) && navigator.maxTouchPoints > 1) return true;
+  return false;
+})();
+var CAN_SHARE = !!(navigator.share) && IS_MOBILE;
+var CAN_STORE = (function(){
+  try{ localStorage.setItem("__t","1"); localStorage.removeItem("__t"); return true; }
+  catch(e){ return false; }
+})();
+if(!CAN_STORE){
+  document.addEventListener("DOMContentLoaded", function(){
+    var d=document.createElement("div");
+    d.className="err";
+    d.innerHTML='<b>このままでは変更の判定ができません</b>'+
+      '送信の記録を保存できない状態です。ファイルを直接開いたときに起こります。'+
+      'Netlify DropやFirebase Hostingに置いて、https のURLから開いてください。'+
+      '文面を作ってコピーすることはこのままでもできます。';
+    document.querySelector(".wrap").insertBefore(d, document.getElementById("drop"));
+  });
+}
+
+const esc = s => String(s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+const clean = s => String(s==null?"":s).replace(/\u3000/g," ").replace(/\s+/g," ").trim();
+const toMin = t => { const p=t.split(":").map(Number); return p[0]*60+p[1]; };
+const sig = v => v.st+"-"+v.en+"|"+v.u+"|"+v.s;
+
+function toast(msg){
+  const t=document.getElementById("toast");
+  t.textContent=msg; t.classList.add("on");
+  clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("on"),2400);
+}
+function save(){
+  try{
+    localStorage.setItem("base_"+KEYDAY, JSON.stringify(BASE));
+    localStorage.setItem("man_"+KEYDAY, JSON.stringify(MAN));
+    localStorage.setItem("note_"+KEYDAY, JSON.stringify(NOTES));
+    localStorage.setItem("pair_"+KEYDAY, JSON.stringify(PAIR));
+    localStorage.setItem("edit_"+KEYDAY, JSON.stringify(EDIT));
+    localStorage.setItem("tpl", JSON.stringify(TPL));
+    localStorage.setItem("skip", JSON.stringify(SKIP));
+    localStorage.setItem("cars", JSON.stringify(CAR));
+    localStorage.setItem("carlist", JSON.stringify(CARLIST));
+  }catch(e){}
+}
+function tidyStorage(){
+  if(!CAN_STORE) return;
+  var keep = 60*24*60*60*1000, now = Date.now(), kill = [];
+  try{
+    for(var i=0;i<localStorage.length;i++){
+      var k = localStorage.key(i);
+      if(!/^(base|memo|man|note|pair|edit)_/.test(k)) continue;
+      var d = k.replace(/^(base|memo|man|note|pair|edit)_/, "");
+      var m = d.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if(!m){ kill.push(k); continue; }                       // 年のない古い形式
+      var t = new Date(+m[1], +m[2]-1, +m[3]).getTime();
+      if(now - t > keep) kill.push(k);                        // 60日より前
+    }
+    kill.forEach(function(k){ localStorage.removeItem(k); });
+  }catch(e){}
+}
+function loadState(){
+  try{ BASE = JSON.parse(localStorage.getItem("base_"+KEYDAY)||"{}"); }catch(e){ BASE={}; }
+  try{ MAN = JSON.parse(localStorage.getItem("man_"+KEYDAY)||"{}"); }catch(e){ MAN={}; }
+  try{ PAIR = JSON.parse(localStorage.getItem("pair_"+KEYDAY)||"{}"); }catch(e){ PAIR={}; }
+  try{ EDIT = JSON.parse(localStorage.getItem("edit_"+KEYDAY)||"{}"); }catch(e){ EDIT={}; }
+  NOTES = [];
+  try{
+    var raw = localStorage.getItem("note_"+KEYDAY);
+    if(raw){
+      var v = JSON.parse(raw);
+      NOTES = (v instanceof Array) ? v : (typeof v === "string" && v ? [v] : []);
+    }
+  }catch(e){ NOTES = []; }
+  try{ SKIP = JSON.parse(localStorage.getItem("skip")||"{}"); }catch(e){ SKIP={}; }
+  try{ CAR = JSON.parse(localStorage.getItem("cars")||"{}"); }catch(e){ CAR={}; }
+  try{
+    var cl = JSON.parse(localStorage.getItem("carlist")||"null");
+    if(cl instanceof Array && cl.length) CARLIST = cl;
+  }catch(e){}
+  try{
+    var c = JSON.parse(localStorage.getItem("tpl")||"null");
+    if(c){ for(var k in c){ if(c.hasOwnProperty(k)) TPL[k]=c[k]; } }
+  }catch(e){}
+}
+function setTpl(which,val){ TPL[which]=val; save(); render(); }
+
+function manOf(n){
+  return (MAN[n]||[]).filter(function(e){ return e && e.k && (e.v || e.sig); });
+}
+function pushUniq(out, v){
+  for(var i=0;i<out.length;i++){ if(sig(out[i])===sig(v)) return; }
+  out.push(v);
+}
+function dropSig(out, sg){
+  for(var i=0;i<out.length;i++){ if(sig(out[i])===sg){ out.splice(i,1); return; } }
+}
+function incoming(name){
+  var got=[];
+  STAFF.forEach(function(o){
+    if(o.n===name) return;
+    manOf(o.n).forEach(function(e){
+      if(e.k==="調整" && e.to===name && e.v) got.push(e.v);
+    });
+  });
+  return got;
+}
+function eff(s){
+  var out = s.v.slice(), ops = manOf(s.n);
+  ops.forEach(function(e){
+    if(e.k==="キャンセル" || e.k==="調整") dropSig(out, e.sig);
+    else if(e.k==="内容変更" && e.v){
+      for(var i=0;i<out.length;i++){ if(sig(out[i])===e.sig){ out[i]=e.v; break; } }
+    }
+  });
+  ops.forEach(function(e){ if(e.k==="追加" && e.v) pushUniq(out, e.v); });
+  incoming(s.n).forEach(function(v){ pushUniq(out, v); });
+  out.sort(function(a,b){ return toMin(a.st)-toMin(b.st); });
+  return out;
+}
+function toggleManual(i){ var n=STAFF[i].n; MANOPEN[n]=!MANOPEN[n]; render(); }
+function toggleTpl(){ TPLOPEN = !TPLOPEN; render(); }
+function toggleNote(){ NOTEOPEN = !NOTEOPEN; render(); }
+function toggleCar(){ CAROPEN = !CAROPEN; render(); }
+const CARLIST_DEFAULT = ["A","Si","Sz","Noa","Hj","Hj2","Hj3","T1","T2","T3","T5","T6","T7","T8","イース（白）","イース（黄）","-"];
+function clearCars(home){
+  var names = home ? HOMENAMES : STAFF.map(function(s){ return s.n; });
+  var n = 0;
+  names.forEach(function(x){ if((CAR[x]||"").trim()) n++; });
+  if(!n){ toast("配車は設定されていません"); return; }
+  if(!confirm(n+"名の配車をすべて消しますか？")) return;
+  names.forEach(function(x){ delete CAR[x]; });
+  saveCars();
+  if(home) renderHome(); else render();
+  toast("配車を消しました");
+}
+function resetCarList(home){
+  if(!confirm("車両の候補一覧を最初の状態に戻しますか？\n各スタッフの配車はそのまま残ります。")) return;
+  CARLIST = CARLIST_DEFAULT.slice();
+  saveCars();
+  if(home) renderHome(); else render();
+  toast("候補一覧を戻しました");
+}
+function clearNotes(){
+  var n = NOTES.filter(function(x){ return x && x.trim(); }).length;
+  if(!n && !NOTES.length){ toast("備考はありません"); return; }
+  if(!confirm("備考の枠をすべて消しますか？")) return;
+  NOTES = []; save(); render(); toast("備考を消しました");
+}
+function addCarList(val){
+  var v = String(val||"").trim();
+  if(!v) return;
+  if(CARLIST.indexOf(v) < 0){ CARLIST.push(v); saveCars(); render(); toast(v+" を一覧に追加しました"); }
+}
+
+function carCounts(names){
+  var c = {};
+  names.forEach(function(n){
+    var v = (CAR[n]||"").trim();
+    if(!v || v === "-") return;
+    c[v] = (c[v]||0) + 1;
+  });
+  return c;
+}
+function dupClass(name, counts){
+  var v = (CAR[name]||"").trim();
+  return (v && v !== "-" && counts[v] > 1) ? " dup" : "";
+}
+function dupList(counts){
+  var out = [];
+  for(var k in counts){ if(counts[k] > 1) out.push(k+"（"+counts[k]+"名）"); }
+  return out;
+}
+function carOptions(name){
+  return '<option value=""'+(!(CAR[name]||"")?' selected':'')+'>—</option>'+
+    CARLIST.map(function(v){
+      return '<option value="'+esc(v)+'"'+(v===(CAR[name]||"")?' selected':'')+'>'+esc(v)+'</option>';
+    }).join("");
+}
+
+function renderHome(){
+  var hp = document.getElementById("hprog");
+  if(hp) hp.remove();
+  try{
+    var raw = localStorage.getItem("staffnames");
+    HOMENAMES = raw ? JSON.parse(raw) : [];
+  }catch(e){ HOMENAMES = []; }
+  try{ CAR = JSON.parse(localStorage.getItem("cars")||"{}"); }catch(e){}
+  try{
+    var cl = JSON.parse(localStorage.getItem("carlist")||"null");
+    if(cl instanceof Array && cl.length) CARLIST = cl;
+  }catch(e){}
+  if(!HOMENAMES.length){ document.getElementById("out").innerHTML = ""; return; }
+
+  var nCar = 0;
+  HOMENAMES.forEach(function(n){ if((CAR[n]||"").trim()) nCar++; });
+  var HCNT = carCounts(HOMENAMES), hdup = dupList(HCNT);
+  document.getElementById("out").innerHTML =
+    (!CAROPEN ?
+      '<div class="bulk" style="margin-top:16px"><span>配車</span><button onclick="toggleCarHome()">配車を設定'+
+        (nCar?'（'+nCar+'名）':'')+'</button></div>' :
+      '<div class="closing" style="margin-top:16px">'+
+        '<div class="cf" style="justify-content:flex-end"><button class="mtoggle" onclick="toggleCarHome()">▾ 閉じる</button></div>'+
+        '<div class="clabel">Excelを読み込む前でも設定できます。前回のスタッフ名を使っています。<br>'+
+        '設定は翌日も引き継がれます。</div>'+
+        (hdup.length ? '<div class="ov">同じ車両が重複しています\n'+esc(hdup.join("　"))+'</div>' : '')+
+        '<div class="cf"><span style="width:auto">追加</span>'+
+          '<input type="text" placeholder="一覧にない車両を入力" onchange="addCarListHome(this.value);this.value=\'\'"></div>'+
+        HOMENAMES.map(function(n,i){
+          return '<div class="carline"><span>'+esc(n)+'</span>'+
+            '<select class="'+(dupClass(n, HCNT).replace(/^ /,""))+'" onchange="setCarHome('+i+',this.value)">'+carOptions(n)+'</select></div>';
+        }).join("")+
+        '<button class="clearbtn" onclick="clearCars(true)">配車をすべて消す</button>'+
+        '<button class="clearbtn quiet" onclick="resetCarList(true)">候補一覧を最初に戻す</button>'+
+      '</div>');
+}
+function toggleCarHome(){ CAROPEN = !CAROPEN; renderHome(); }
+function setNote(i,v){ NOTES[i] = v; save(); }
+function addNote(){ NOTES.push(""); NOTEOPEN = true; render(); }
+function delNote(i){
+  if(!NOTES[i] || !NOTES[i].trim() || confirm("この備考を削除しますか？")){
+    NOTES.splice(i,1); save(); render();
+  }
+}
+function toggleRow(i){ var n=STAFF[i].n; ROWOPEN[n]=!ROWOPEN[n]; render(); }
+function setAllSkip(off){
+  STAFF.forEach(function(s){ if(off) SKIP[s.n]=1; else delete SKIP[s.n]; });
+  save(); render();
+}
+function toggleSkip(i){
+  var n=STAFF[i].n;
+  if(SKIP[n]) delete SKIP[n]; else SKIP[n]=1;
+  save(); render();
+}
+function setManForm(i,k){ MANFORM[STAFF[i].n]=k; MANOPEN[STAFF[i].n]=true; MANSEL[STAFF[i].n]=""; render(); }
+function setManSel(i,v){
+  var n = STAFF[i].n;
+  MANSEL[n] = v;
+  MANTIME[n] = null;
+  if(v){
+    eff(STAFF[i]).forEach(function(x){ if(sig(x)===v) MANTIME[n] = {st:x.st, en:x.en}; });
+  }
+  MANOPEN[n] = true; render();
+}
+function setManTime(i,which,val){
+  var n = STAFF[i].n, t = normTime(val);
+  if(!MANTIME[n]) MANTIME[n] = {st:"", en:""};
+  MANTIME[n][which] = t;
+  render();
+}
+function normTime(t){
+  return String(t)
+    .replace(/[０-９]/g, function(c){ return String.fromCharCode(c.charCodeAt(0)-0xFEE0); })
+    .replace(/[：:・.．]/g, ":")
+    .replace(/[\s\u3000]/g, "")
+    .replace(/時/g, ":").replace(/分/g, "");
+}
+function okTime(t){ return /^\d{1,2}:\d{2}$/.test(t); }
+
+function addManual(i){
+  var n=STAFF[i].n, k=MANFORM[n]||"追加", e=null, g=function(id){
+    var el=document.getElementById(id+i); return el? el.value.trim() : "";
+  };
+  if(k==="追加"){
+    var st=normTime(g("mst")), en=normTime(g("men")), u=g("mu"), sv=g("ms");
+    if(!okTime(st)||!okTime(en)){ toast("時刻は 8:00 の形で入れてください"); return; }
+    u = u.replace(/\u3000/g," ").replace(/\s+/g," ").trim();
+    if(!u){ toast("利用者名を入れてください"); return; }
+    var nv={st:st, en:en, u:u, s:sv||"未定"};
+    if(!confirmOverlap(n, eff(STAFF[i]), nv)) return;
+    e={k:"追加", v:nv};
+  }else{
+    var sg=g("msel");
+    if(!sg){ toast("対象の訪問を選んでください"); return; }
+    var cur=eff(STAFF[i]), tgt=null;
+    cur.forEach(function(v){ if(sig(v)===sg) tgt=v; });
+    if(!tgt){ toast("対象の訪問が見つかりません"); return; }
+    if(k==="キャンセル"){
+      e={k:"キャンセル", sig:sg, label:line(tgt)};
+    }else if(k==="内容変更"){
+      var nst = normTime(g("est")), nen = normTime(g("een"));
+      var nu = g("eu").replace(/\u3000/g," ").replace(/\s+/g," ").trim();
+      var ns = g("es").trim();
+      if(!okTime(nst)||!okTime(nen)){ toast("時刻は 8:00 の形で入れてください"); return; }
+      if(!nu){ toast("利用者名を入れてください"); return; }
+      var nv = {st:nst, en:nen, u:nu, s:ns||tgt.s};
+      if(sig(nv)===sg){ toast("内容が変わっていません"); return; }
+      var others = eff(STAFF[i]).filter(function(x){ return sig(x)!==sg; });
+      if(!confirmOverlap(n, others, nv)) return;
+      e={k:"内容変更", sig:sg, v:nv, before:{st:tgt.st,en:tgt.en,u:tgt.u,s:tgt.s}};
+    }else{
+      var to=g("mto");
+      if(!to){ toast("お願いするヘルパーを選んでください"); return; }
+      if(to===n){ toast("同じ人には移せません"); return; }
+      var ms=normTime(g("mst2")), me=normTime(g("men2"));
+      if(!okTime(ms)) ms = tgt.st;
+      if(!okTime(me)) me = tgt.en;
+      var mv = {st:ms, en:me, u:tgt.u, s:tgt.s};
+      var dst=null;
+      STAFF.forEach(function(o){ if(o.n===to) dst=o; });
+      if(dst && !confirmOverlap(to, eff(dst), mv)) return;
+      e={k:"調整", sig:sg, to:to, v:mv,
+         label:line(tgt)+"　→ "+to+(sig(mv)!==sg ? "（"+ms+"-"+me+"）" : "")};
+    }
+  }
+  if(!MAN[n]) MAN[n]=[];
+  MAN[n].push(e); MANOPEN[n]=true; MANSEL[n]=""; MANTIME[n]=null; save(); render();
+  toast(k+"を登録しました");
+}
+function delManual(i,j){
+  var n=STAFF[i].n;
+  if(MAN[n]){ MAN[n].splice(j,1); if(!MAN[n].length) delete MAN[n]; }
+  MANOPEN[n]=true; save(); render();
+}
+function manBuckets(s){
+  var add=[], can=[], adj=[], edit=[];
+  manOf(s.n).forEach(function(e){
+    if(e.k==="追加" && e.v) add.push(line(e.v));
+    else if(e.k==="キャンセル") can.push(e.label||"");
+    else if(e.k==="調整" && e.v) adj.push(line(e.v));
+    else if(e.k==="内容変更" && e.before && e.v)
+      edit.push(line(e.before)+"\n　↓\n"+line(e.v));
+  });
+  incoming(s.n).forEach(function(v){ add.push(line(v)); });
+  return {add:add, can:can, adj:adj, edit:edit,
+          any:add.length||can.length||adj.length||edit.length};
+}
+function sections(b){
+  var t="";
+  if(b.add.length) t += "\n■追加\n" + b.add.join("\n") + "\n";
+  if(b.can.length) t += "\n■キャンセル\n" + b.can.join("\n") + "\n";
+  if(b.adj.length) t += "\n■担当変更\n" + b.adj.join("\n") + "\n";
+  if(b.edit && b.edit.length) t += "\n■内容変更\n" + b.edit.join("\n") + "\n";
+  if(b.chg && b.chg.length) t += "\n■時間変更\n" + b.chg.join("\n") + "\n";
+  return t;
+}
+function plainList(s, cur){
+  if(!cur.length) return "この日の訪問予定はありません。";
+  return cur.map(function(v){
+    var p = partnerOf(s, v);
+    return line(v) + (p ? "（"+p+" と同行）" : "");
+  }).join("\n");
+}
+function manLabel(e){
+  if(e.k==="追加") return line(e.v);
+  if(e.k==="内容変更" && e.before && e.v) return line(e.before)+" → "+line(e.v);
+  return e.label || "";
+}
+function whenWord(){
+  if(!DATEOBJ) return "";
+  var t=new Date(); t.setHours(0,0,0,0);
+  var d=new Date(DATEOBJ.getTime()); d.setHours(0,0,0,0);
+  var n=Math.round((d-t)/86400000);
+  return n===0?"本日":n===1?"明日":n===2?"明後日":n===-1?"昨日":"";
+}
+function subst(t){
+  return String(t).replace(/[{｛]日付[}｝]/g, DAY).replace(/[{｛]いつ[}｝]/g, whenWord());
+}
+
+/* ---- Excel 読み取り ---- */
+function parse(rows){
+  var day="", dobj=null, dobj2=null;
+  var mk = function(y,mo,d){ return new Date(2018+parseInt(y,10), parseInt(mo,10)-1, parseInt(d,10)); };
+  for(var i=0;i<Math.min(rows.length,6) && !dobj;i++){
+    var r0 = rows[i]||[];
+    for(var k=0;k<r0.length;k++){
+      var txt = clean(r0[k]);
+      var mm = txt.match(/令和\s*(\d+)\s*年\s*(\d+)\s*月\s*(\d+)\s*日\s*[～~〜\-]\s*令和\s*(\d+)\s*年\s*(\d+)\s*月\s*(\d+)\s*日/);
+      if(mm){
+        dobj = mk(mm[1],mm[2],mm[3]); dobj2 = mk(mm[4],mm[5],mm[6]);
+        day = mm[2]+"/"+mm[3];
+        break;
+      }
+      var m = txt.match(/令和\s*(\d+)\s*年\s*(\d+)\s*月\s*(\d+)\s*日/);
+      if(m){ dobj = mk(m[1],m[2],m[3]); day = m[2]+"/"+m[3]; break; }
+    }
+  }
+  var multi = !!(dobj && dobj2 && dobj.getTime() !== dobj2.getTime());
+  var staff=[];
+  for(var i2=0;i2<rows.length;i2++){
+    var row = rows[i2]||[];
+    var name = clean(row[2]);
+    if(!name || name==="スタッフ名") continue;
+    var users = rows[i2+1]||[], svcs = rows[i2+2]||[];
+    var v=[];
+    for(var j=3;j<row.length;j++){
+      var t = clean(row[j]);
+      if(!TIME.test(t)) continue;
+      var u = clean(users[j]), s = clean(svcs[j]);
+      if(/^担\s*会/.test(u)) continue;
+      var p = t.split("-");
+      v.push({st:p[0].trim(), en:p[1].trim(), u:u, s:s});
+    }
+    v.sort(function(a,b){ return toMin(a.st)-toMin(b.st); });
+    staff.push({n:name, v:v, row:i2});
+  }
+  var pad = function(n){ return (n<10?"0":"")+n; };
+  var key = dobj ? (dobj.getFullYear()+"-"+pad(dobj.getMonth()+1)+"-"+pad(dobj.getDate())) : day;
+  if(dobj) day += "\u3000"+DOW[dobj.getDay()];
+  var dup = [], seen = {};
+  staff.forEach(function(s){ if(seen[s.n]) dup.push(s.n); seen[s.n]=1; });
+  return {day:day, key:key, dobj:dobj, dobj2:dobj2, multi:multi, dup:dup, staff:staff};
+}
+
+/* ---- 差分 ---- */
+function diff(prev, curr){
+  var P = prev.slice(), C = curr.slice();
+  var moved=[], svcChg=[], i, j;
+  for(i=P.length-1;i>=0;i--){
+    for(j=0;j<C.length;j++){ if(sig(C[j])===sig(P[i])) break; }
+    if(j<C.length){ C.splice(j,1); P.splice(i,1); }
+  }
+  for(i=P.length-1;i>=0;i--){
+    for(j=0;j<C.length;j++){ if(C[j].u===P[i].u && C[j].s===P[i].s) break; }
+    if(j<C.length){ moved.push({from:P[i], to:C[j]}); C.splice(j,1); P.splice(i,1); }
+  }
+  for(i=P.length-1;i>=0;i--){
+    for(j=0;j<C.length;j++){ if(C[j].u===P[i].u) break; }
+    if(j<C.length){ svcChg.push({from:P[i], to:C[j]}); C.splice(j,1); P.splice(i,1); }
+  }
+  var byTime = function(a,b){ return toMin(a.st)-toMin(b.st); };
+  var byTo = function(a,b){ return toMin(a.to.st)-toMin(b.to.st); };
+  return {
+    added:C.sort(byTime), removed:P.sort(byTime),
+    moved:moved.sort(byTo), svcChg:svcChg.sort(byTo),
+    changed: C.length||P.length||moved.length||svcChg.length
+  };
+}
+function line(v){ return v.st+"-"+v.en+" "+v.u+"／"+v.s; }
+
+/* ---- 文面 ---- */
+function head(kind){
+  var x=(TPL[kind+"Head"]||"").trim();
+  return x ? subst(x)+"\n\n" : "";
+}
+function tail(s, kind){
+  var t="", c=(TPL[kind+"Foot"]||"").trim();
+  if(c) t += "\n\n"+subst(c);
+  return t;
+}
+function fullText(s){
+  return head("normal") + plainList(s, eff(s)) + tail(s,"normal");
+}
+function uniq(a){
+  var seen={}, out=[];
+  a.forEach(function(x){ if(x && !seen[x]){ seen[x]=1; out.push(x); } });
+  return out;
+}
+function buckets(s, d){
+  var add=[], can=[], adj=[], chg=[];
+  if(d){
+    d.added.forEach(function(v){ add.push(line(v)); });
+    d.removed.forEach(function(v){ can.push(line(v)); });
+    d.moved.forEach(function(x){
+      chg.push(x.to.u+"／"+x.to.s+"　"+x.from.st+"-"+x.from.en+" → "+x.to.st+"-"+x.to.en); });
+    d.svcChg.forEach(function(x){
+      chg.push(x.to.u+"　"+x.from.s+" → "+x.to.s+"（"+x.to.st+"-"+x.to.en+"）"); });
+  }
+  var m = manBuckets(s);
+  add = uniq(add.concat(m.add));
+  can = uniq(can.concat(m.can));
+  adj = uniq(adj.concat(m.adj));
+  chg = uniq(chg);
+  var edit = uniq(m.edit);
+  return {add:add, can:can, adj:adj, chg:chg, edit:edit,
+          any:add.length||can.length||adj.length||chg.length||edit.length};
+}
+function changeText(s, d){
+  var b = buckets(s, d);
+  var t = head("change") + "【変更のお知らせ】\n";
+  t += sections(b);
+  t += "\n──────\n【変更後の予定】\n";
+  t += plainList(s, eff(s));
+  return t + tail(s,"change");
+}
+function diffHTML(s, d){
+  var b = buckets(s, d), p=[];
+  if(b.add.length) p.push("追加：" + b.add.join(" ／ "));
+  if(b.can.length) p.push("キャンセル：" + b.can.join(" ／ "));
+  if(b.adj.length) p.push("担当変更：" + b.adj.join(" ／ "));
+  if(b.edit && b.edit.length) p.push("内容変更：" + b.edit.map(function(x){ return x.replace(/\n　↓\n/," → "); }).join(" ／ "));
+  if(b.chg && b.chg.length) p.push("時間変更：" + b.chg.join(" ／ "));
+  return esc(p.join("\n"));
+}
+
+/* ---- 表示 ---- */
+function render(){
+  var CARCNT = carCounts(STAFF.map(function(s){ return s.n; }));
+  var UCLASH = userClashes();
+  var nClash = 0;
+  for(var uk in UCLASH) nClash++;
+  var nNew=0, nChg=0, nOk=0, nSkip=0;
+  var rows = STAFF.map(function(s,i){
+    var cb = '<input type="checkbox" class="pick2" '+(SKIP[s.n]?"":"checked")+
+      ' onclick="event.stopPropagation()" onchange="toggleSkip('+i+')" title="送信する人にチェック">';
+
+    if(SKIP[s.n]){
+      nSkip++;
+      return '<div class="row off" id="row'+i+'">'+
+        '<div class="rhead">'+cb+'<span class="nm">'+esc(s.n)+'</span>'+
+        '<span class="cnt">送信しない</span></div></div>';
+    }
+
+    var prev = BASE[s.n], cur = eff(s);
+    var d = prev ? diff(prev, cur) : null;
+    var b = buckets(s, d);
+    var mlist = manOf(s.n);
+    var ov = overlapsIn(cur);
+    var range = cur.length ? cur[0].st+"〜"+cur[cur.length-1].en+"・"+cur.length+"件" : "予定なし";
+
+    var cls, tag, mode, label, bcls;
+    if(b.any){ nChg++; cls="row chg"; tag='<span class="tag chg">変更</span>'; mode="chg";
+               label = CAN_SHARE ? "変更を送る" : "変更をコピー"; bcls="go warn"; }
+    else if(!prev){ nNew++; cls="row"; tag=""; mode="full";
+               label = CAN_SHARE ? "送る" : "コピー"; bcls="go"; }
+    else { nOk++; cls="row done"; tag='<span class="tag ok">済</span>'; mode="full";
+               label = CAN_SHARE ? "再送" : "再コピー"; bcls="go quiet"; }
+
+    var open = !!ROWOPEN[s.n];
+    var edited2 = (typeof EDIT[s.n] === "string");
+    var carSel = '<select class="carmini'+dupClass(s.n, CARCNT)+'" onclick="event.stopPropagation()" '+
+      'onchange="event.stopPropagation();setCar('+i+',this.value)" title="配車">'+
+      carOptions(s.n)+'</select>';
+
+    var head = '<div class="rhead" onclick="toggleRow('+i+')">'+cb+
+      '<span class="nm">'+esc(s.n)+'</span>'+tag+
+      '<span class="tag ed"'+(edited2?'':' style="display:none"')+'>手直し</span>'+carSel+
+      '<span class="cnt">'+range+'</span>'+
+      '<button class="'+bcls+'" onclick="event.stopPropagation();send('+i+',\''+mode+'\')">'+label+'</button>'+
+      '<span class="chev">'+(open?"▾":"▸")+'</span></div>';
+
+    var alert = "";
+    if(ov.length) alert += '<div class="ov">時間が重なっています\n'+esc(ov.join("\n"))+'</div>';
+    if(UCLASH[s.n]){
+      alert += '<div class="uc">同じ利用者に同じ時間の予定があります'+
+        UCLASH[s.n].map(function(c){
+          var isOn = !!(PAIR[s.n] && PAIR[s.n][c.sig]);
+          return '<div class="ucrow"><span>'+esc(c.text)+'</span>'+
+            '<button class="'+(isOn?"on":"")+'" onclick="togglePair('+i+',\''+esc(c.sig).replace(/'/g,"")+'\',\''+esc(c.partner).replace(/'/g,"")+'\')">'+
+            (isOn ? "✓ 同行" : "同行にする")+'</button></div>';
+        }).join("")+
+      '</div>';
+    }
+    if(b.any)     alert += '<div class="diff">'+diffHTML(s,d)+'</div>';
+
+    if(!open){
+      return '<div class="'+cls+'" id="row'+i+'">'+head+alert+'</div>';
+    }
+
+    var mopen = MANOPEN[s.n] || mlist.length>0;
+    var kind = MANFORM[s.n] || "追加";
+    var kindSel = '<select class="mkind" onchange="setManForm('+i+',this.value)">'+
+      ["追加","キャンセル","調整","内容変更"].map(function(k){
+        return '<option'+(k===kind?' selected':'')+'>'+k+'</option>'; }).join("")+'</select>';
+    var selSig = MANSEL[s.n] || "";
+    var visSel = '<select id="msel'+i+'" onchange="setManSel('+i+',this.value)">'+
+      '<option value="">訪問を選ぶ</option>'+
+      cur.map(function(v){
+        var g = sig(v);
+        return '<option value="'+esc(g)+'"'+(g===selSig?' selected':'')+'>'+esc(line(v))+'</option>';
+      }).join("")+'</select>';
+    var form;
+    if(kind==="追加"){
+      form = '<div class="mrow2">'+
+        '<input type="text" id="mst'+i+'" placeholder="開始 8:00">'+
+        '<input type="text" id="men'+i+'" placeholder="終了 8:30">'+
+      '</div><div class="mrow2">'+
+        '<input type="text" id="mu'+i+'" placeholder="利用者名">'+
+        '<input type="text" id="ms'+i+'" list="svclist" placeholder="サービス">'+
+      '</div>';
+    }else if(kind==="キャンセル"){
+      form = '<div class="mrow2">'+visSel+'</div>';
+    }else if(kind==="内容変更"){
+      var cv = null;
+      cur.forEach(function(v){ if(sig(v)===selSig) cv = v; });
+      form = '<div class="mrow2">'+visSel+'</div>'+
+        (cv ?
+          '<div class="mrow2">'+
+            '<input type="text" id="est'+i+'" value="'+esc(cv.st)+'" placeholder="開始">'+
+            '<input type="text" id="een'+i+'" value="'+esc(cv.en)+'" placeholder="終了">'+
+          '</div><div class="mrow2">'+
+            '<input type="text" id="eu'+i+'" value="'+esc(cv.u)+'" placeholder="利用者名">'+
+            '<input type="text" id="es'+i+'" list="svclist" value="'+esc(cv.s)+'" placeholder="サービス">'+
+          '</div>'
+          : '<div class="mnote">直したい訪問を選ぶと、内容が出ます</div>');
+    }else{
+      var tgtV = null;
+      cur.forEach(function(v){ if(sig(v)===selSig) tgtV = v; });
+      var mt = MANTIME[s.n];
+      var moveV = tgtV ? {st:(mt&&okTime(mt.st))?mt.st:tgtV.st,
+                          en:(mt&&okTime(mt.en))?mt.en:tgtV.en,
+                          u:tgtV.u, s:tgtV.s} : null;
+      var nFree = 0, nBusy = 0;
+      var toSel = '<select id="mto'+i+'"><option value="">お願いするヘルパーを選ぶ</option>'+
+        STAFF.map(function(o){
+          if(o.n===s.n || SKIP[o.n]) return "";
+          var mark = "";
+          if(moveV){
+            var c = hits(eff(o), moveV);
+            if(c.length){ nBusy++; mark = "　△ 重なり"; }
+            else { nFree++; mark = "　◯ 空き"; }
+          }
+          return '<option value="'+esc(o.n)+'">'+esc(o.n+mark)+'</option>';
+        }).join("")+'</select>';
+      var timeRow = tgtV ?
+        '<div class="mrow2">'+
+          '<input type="text" id="mst2'+i+'" value="'+esc(moveV.st)+'" placeholder="開始" '+
+            'onchange="setManTime('+i+',\'st\',this.value)">'+
+          '<input type="text" id="men2'+i+'" value="'+esc(moveV.en)+'" placeholder="終了" '+
+            'onchange="setManTime('+i+',\'en\',this.value)">'+
+        '</div>' : "";
+      var note = "";
+      if(tgtV){
+        var moved = (moveV.st!==tgtV.st || moveV.en!==tgtV.en);
+        note = '<div class="mnote">'+
+          (moved ? moveV.st+"-"+moveV.en+" で移します　" : "") +
+          (nFree ? '◯ 空き '+nFree+'名　／　△ 重なり '+nBusy+'名'
+                 : 'この時間に空いているヘルパーはいません')+'</div>';
+      }else{
+        note = '<div class="mnote">先に移す訪問を選ぶと、誰が空いているか出ます</div>';
+      }
+      form = '<div class="mrow2">'+visSel+'</div>'+timeRow+note+'<div class="mrow2">'+toSel+'</div>';
+    }
+    var manHTML = '<div class="manual">'+
+      '<button class="mtoggle" onclick="toggleManual('+i+')">'+(mopen?"▾":"▸")+' 変更を手で足す'+
+        (mlist.length?'（'+mlist.length+'件）':'')+'</button>'+
+      (mopen ?
+        '<div class="mbox">'+
+          mlist.map(function(e,j){
+            return '<div class="mitem"><b>'+esc(e.k)+'</b><span>'+esc(manLabel(e))+'</span>'+
+              '<button onclick="delManual('+i+','+j+')" aria-label="削除">✕</button></div>';
+          }).join("")+
+          '<div class="mrow">'+kindSel+'<button onclick="addManual('+i+')">足す</button></div>'+
+          form+
+        '</div>' : '')+
+      '</div>';
+
+    var edited = (typeof EDIT[s.n] === "string");
+    var body = '<div class="btns">'+
+        (CAN_SHARE ? '<button class="btn copy" onclick="copyT('+i+',\''+mode+'\')">コピー</button>' : '')+
+        '<button class="btn peek" onclick="peek('+i+')">'+
+          ((PREVCLOSED[s.n]) ? "LINE送信内容" : "閉じる")+'</button>'+
+      '</div>'+manHTML+
+      '<div class="prevwrap">'+
+        '<textarea class="prev" rows="10" oninput="setEdit('+i+',this.value)">'+
+          esc(edited ? EDIT[s.n] : (mode==="chg" ? changeText(s,d) : fullText(s)))+
+        '</textarea>'+
+        '<div class="editnote"'+(edited?'':' style="display:none"')+'>'+
+          '手直しした文面を送ります。予定を変えてもここには反映されません。'+
+          '<button onclick="resetEdit('+i+')">元に戻す</button></div>'+
+      '</div>';
+
+    return '<div class="'+cls+' open'+(PREVCLOSED[s.n]?'':' showprev')+'" id="row'+i+'">'+head+alert+body+'</div>';
+  }).join("");
+
+  var total = STAFF.reduce(function(a,s){ return a+eff(s).length; },0);
+  var hint = "";
+  if(nChg===0 && nOk===0){
+    hint = '<div class="hint">今はまだ誰にも送っていないので、変更の判定はできません。'+
+           '送った人から順に記録され、次にExcelを読ませたときに変わっていれば「変更あり」と出ます。<br>'+
+           '別の方法ですでに全員へ配ってある場合は、下の「全員を送信済みにする」を押してください。</div>';
+  }
+  function fld(key,lab,ph){
+    return '<div class="cf"><span>'+lab+'</span><input type="text" value="'+esc(TPL[key]||"")+
+      '" placeholder="'+ph+'" onchange="setTpl(\''+key+'\',this.value)"></div>';
+  }
+  var nOff = 0;
+  STAFF.forEach(function(s){ if(SKIP[s.n]) nOff++; });
+  var bulk =
+    '<div class="bulk">'+
+      '<span>送信対象</span>'+
+      '<button onclick="setAllSkip(false)">全員に入れる</button>'+
+      '<button onclick="setAllSkip(true)">全員から外す</button>'+
+    '</div>';
+
+  var nCar = 0;
+  STAFF.forEach(function(s){ if((CAR[s.n]||"").trim()) nCar++; });
+  var carBox = !CAROPEN ?
+    '<div class="bulk"><span>配車</span><button onclick="toggleCar()">配車を設定'+
+      (nCar?'（'+nCar+'名）':'')+'</button></div>' :
+    '<div class="closing">'+
+      '<div class="cf" style="justify-content:flex-end"><button class="mtoggle" onclick="toggleCar()">▾ 閉じる</button></div>'+
+      '<div class="clabel">Excelのスタッフ名の右に大きく入ります。翌日も引き継がれます。<br>'+
+      '誰か1人でも設定すると、未設定の人は「-」になります。</div>'+
+      '<div class="cf"><span style="width:auto">追加</span>'+
+        '<input type="text" placeholder="一覧にない車両を入力" onchange="addCarList(this.value);this.value=\'\'"></div>'+
+      STAFF.map(function(s,i){
+        return '<div class="carline"><span>'+esc(s.n)+'</span>'+
+          '<select class="'+(dupClass(s.n, CARCNT).replace(/^ /,""))+'" onchange="setCar('+i+',this.value)">'+
+            carOptions(s.n)+
+          '</select></div>';
+      }).join("")+
+      '<button class="clearbtn" onclick="clearCars(false)">配車をすべて消す</button>'+
+      '<button class="clearbtn quiet" onclick="resetCarList(false)">候補一覧を最初に戻す</button>'+
+    '</div>';
+
+  var nNote = NOTES.filter(function(x){ return x && x.trim(); }).length;
+  var noteBox = !NOTEOPEN ?
+    '<div class="bulk"><span>Excel備考</span><button onclick="toggleNote()">備考の枠'+
+      (nNote?'（'+nNote+'件）':'')+'</button></div>' :
+    '<div class="closing">'+
+      '<div class="cf" style="justify-content:flex-end"><button class="mtoggle" onclick="toggleNote()">▾ 閉じる</button></div>'+
+      '<div class="clabel">1つの入力欄が、Excelの1つの枠になります。予定表の右側に縦に並びます。<br>'+
+      '表そのものは変わりません。7件までが表の高さに収まります。</div>'+
+      NOTES.map(function(t,i){
+        return '<div class="nblock">'+
+          '<div class="nhead"><span>枠 '+(i+1)+'</span>'+
+            '<button onclick="delNote('+i+')" aria-label="削除">✕</button></div>'+
+          '<textarea class="notearea" rows="5" placeholder="山田 太郎&#10;&#10;行き（9:00自宅迎え→〇〇病院）&#10;&#10;帰り（あり）" '+
+          'onchange="setNote('+i+',this.value)">'+esc(t)+'</textarea>'+
+        '</div>';
+      }).join("")+
+      '<button class="naddbtn" onclick="addNote()">＋ 枠を追加</button>'+
+      (NOTES.length ? '<button class="clearbtn" onclick="clearNotes()">備考をすべて消す</button>' : '')+
+    '</div>';
+
+  var closing = !TPLOPEN ?
+    '<div class="bulk"><span>定型文</span><button onclick="toggleTpl()">冒頭と結びを編集</button></div>' :
+    '<div class="closing">'+
+      '<div class="cf" style="justify-content:flex-end"><button class="mtoggle" onclick="toggleTpl()">▾ 閉じる</button></div>'+
+      '<div class="clabel">予定の前後に付ける文です。翌日も引き継がれます。空欄にすれば何も付きません。<br>'+
+      '<b>{日付}</b> → '+esc(DAY)+'　／　<b>{いつ}</b> → '+esc(whenWord()||"（判定できません）")+
+      '　が自動で入ります。</div>'+
+      '<div class="cgrp">通常の連絡</div>'+
+      fld("normalHead","冒頭","例：{いつ}（{日付}）の連絡です。")+
+      fld("normalFoot","結び","例：よろしくお願い致します。")+
+      '<div class="cgrp">変更の連絡</div>'+
+      fld("changeHead","冒頭","例：{いつ}（{日付}）の変更連絡です。")+
+      fld("changeFoot","結び","例：以上、変更追加よろしいでしょうか？")+
+    '</div>';
+
+  var target = nNew + nChg + nOk;
+  var pct = target ? Math.round(nOk / target * 100) : 0;
+  var prog = '<div class="hprog">'+
+    '<div class="bar"><i style="width:'+pct+'%"></i></div>'+
+    '<div class="lbl"><span>'+esc(DAY)+'　訪問'+total+'件</span>'+
+    '<span>'+nOk+' / '+target+' 送信済み</span></div></div>';
+  var hw = document.querySelector("header .wrap");
+  var old = document.getElementById("hprog");
+  if(old) old.remove();
+  var wrap = document.createElement("div");
+  wrap.id = "hprog"; wrap.style.width = "100%";
+  wrap.innerHTML = prog;
+  hw.appendChild(wrap);
+
+  document.getElementById("out").innerHTML =
+    '<div class="tally">'+
+      (nChg?'<i class="w">変更 '+nChg+'名</i>':'')+
+      (nNew?'<i class="n">未送信 '+nNew+'名</i>':'')+
+      (nSkip?'<i>送らない '+nSkip+'名</i>':'')+
+      (dupList(CARCNT).length?'<i class="w">配車の重複 '+dupList(CARCNT).join("・")+'</i>':'')+
+      (nClash?'<i class="w">利用者の重複 '+nClash+'名</i>':'')+
+    '</div>'+bulk+closing+carBox+noteBox+hint+rows+
+    '<div class="tools">'+
+      '<button onclick="copyAll()">全員分をまとめてコピー</button>'+
+      '<button onclick="exportGrid()">変更後のExcel（元の形式）</button>'+
+      '<button onclick="markAll()">全員を送信済みにする</button>'+
+      '<button class="danger" onclick="resetAll()">送信の記録を消す</button>'+
+      '<button onclick="location.reload()">別のファイルを読む</button>'+
+    '</div>';
+}
+
+function setCar(i,val){ setCarName(STAFF[i].n, val); }
+function setCarName(n,val){
+  CAR[n] = String(val||"").trim();
+  saveCars();
+  if(STAFF.length) render(); else renderHome();
+}
+function saveCars(){
+  try{
+    localStorage.setItem("cars", JSON.stringify(CAR));
+    localStorage.setItem("carlist", JSON.stringify(CARLIST));
+  }catch(e){}
+}
+function setCarHome(i,val){ setCarName(HOMENAMES[i], val); }
+function addCarListHome(val){
+  var v = String(val||"").trim();
+  if(!v) return;
+  if(CARLIST.indexOf(v) < 0){ CARLIST.push(v); saveCars(); renderHome(); toast(v+" を一覧に追加しました"); }
+}
+function peek(i){ var n=STAFF[i].n; PREVCLOSED[n] = !PREVCLOSED[n]; render(); }
+function syncEditUI(i){
+  var n = STAFF[i].n, row = document.getElementById("row"+i);
+  if(!row) return;
+  var on = (typeof EDIT[n] === "string");
+  var note = row.querySelector(".editnote");
+  if(note) note.style.display = on ? "block" : "none";
+  var tag = row.querySelector(".tag.ed");
+  if(tag) tag.style.display = on ? "" : "none";
+}
+
+function baseText(i,mode){
+  var s=STAFF[i];
+  if(mode==="chg" && BASE[s.n]) return changeText(s, diff(BASE[s.n], eff(s)));
+  return fullText(s);
+}
+function textOf(i,mode){
+  var s=STAFF[i];
+  if(typeof EDIT[s.n] === "string") return EDIT[s.n];
+  return baseText(i,mode);
+}
+function setEdit(i,val){
+  var s=STAFF[i], v=String(val);
+  if(v === baseText(i, editModeOf(i))) delete EDIT[s.n];
+  else { EDIT[s.n] = v; delete PREVCLOSED[s.n]; }
+  save(); syncEditUI(i);
+}
+function editModeOf(i){
+  var s=STAFF[i], prev=BASE[s.n];
+  return buckets(s, prev ? diff(prev, eff(s)) : null).any ? "chg" : "full";
+}
+function resetEdit(i){
+  var n = STAFF[i].n;
+  delete EDIT[n]; save();
+  var row = document.getElementById("row"+i);
+  var ta = row ? row.querySelector("textarea.prev") : null;
+  if(ta) ta.value = baseText(i, editModeOf(i));
+  syncEditUI(i);
+}
+function mark(i){
+  var n=STAFF[i].n;
+  BASE[n] = eff(STAFF[i]);
+  MANOPEN[n]=false;
+  save(); render();
+}
+
+function send(i,mode){
+  var t = textOf(i,mode);
+  if(CAN_SHARE){
+    navigator.share({text:t}).then(function(){ mark(i); }).catch(function(e){
+      if(e && e.name==="AbortError") return;
+      copyT(i,mode);
+    });
+    return;
+  }
+  copyT(i,mode);
+}
+function copyT(i,mode){
+  var t = textOf(i,mode), nm = STAFF[i].n;
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(function(){ mark(i); toast(nm+"の分をコピーしました。LINEに貼り付けてください"); })
+      .catch(function(){ fallbackCopy(i,t,nm); });
+    return;
+  }
+  fallbackCopy(i,t,nm);
+}
+function fallbackCopy(i,t,nm){
+  var ta=document.createElement("textarea");
+  ta.value=t; ta.style.cssText="position:fixed;top:0;left:0;opacity:0";
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand("copy"); ta.remove(); mark(i); toast(nm+"の分をコピーしました"); }
+  catch(e){ ta.remove(); delete PREVCLOSED[STAFF[i].n]; render(); toast("下の文章を長押しでコピーしてください"); }
+}
+function markAll(){
+  if(!CAN_STORE){ alert("この状態では記録を保存できません。https のURLから開いてください。"); return; }
+  if(confirm("今の内容を全員に伝えたものとして記録しますか？\n次にExcelを読ませたとき、ここから変わった人が「変更あり」と出ます。")){
+    STAFF.forEach(function(s){ if(!SKIP[s.n]) BASE[s.n]=eff(s); });
+    save(); render(); toast("全員を送信済みとして記録しました");
+  }
+}
+function colOf(t){ return 3 + Math.round((toMin(t)-360)/5); }
+
+function hits(list, v){
+  var a=toMin(v.st), b=toMin(v.en), out=[];
+  list.forEach(function(x){
+    if(sig(x)===sig(v)) return;
+    if(a < toMin(x.en) && toMin(x.st) < b) out.push(line(x));
+  });
+  return out;
+}
+function userClashes(){
+  var all = [], out = {};
+  STAFF.forEach(function(s){
+    if(SKIP[s.n]) return;
+    eff(s).forEach(function(v){ all.push({n:s.n, v:v}); });
+  });
+  var push = function(who, other, v, ov){
+    (out[who] = out[who] || []).push({
+      sig: sig(v), partner: other,
+      text: v.u + "　" + v.st+"-"+v.en + " と " + other + "さんの " + ov.st+"-"+ov.en
+    });
+  };
+  for(var i=0;i<all.length;i++){
+    for(var j=i+1;j<all.length;j++){
+      var a = all[i], b = all[j];
+      if(a.v.u !== b.v.u) continue;
+      if(a.n === b.n) continue;
+      if(!(toMin(a.v.st) < toMin(b.v.en) && toMin(b.v.st) < toMin(a.v.en))) continue;
+      push(a.n, b.n, a.v, b.v);
+      push(b.n, a.n, b.v, a.v);
+    }
+  }
+  return out;
+}
+function partnerOf(s, v){
+  var m = PAIR[s.n];
+  return (m && m[sig(v)]) ? m[sig(v)] : null;
+}
+function togglePair(i, sg, who){
+  var n = STAFF[i].n;
+  if(!PAIR[n]) PAIR[n] = {};
+  if(PAIR[n][sg]) delete PAIR[n][sg]; else PAIR[n][sg] = who;
+  save(); render();
+}
+function overlapsIn(list){
+  var out=[];
+  for(var i=0;i<list.length;i++){
+    for(var j=i+1;j<list.length;j++){
+      if(toMin(list[i].st) < toMin(list[j].en) && toMin(list[j].st) < toMin(list[i].en)){
+        out.push(line(list[i])+" と "+line(list[j]));
+      }
+    }
+  }
+  return out;
+}
+function confirmOverlap(who, list, v){
+  var c = hits(list, v);
+  if(!c.length) return true;
+  var ok = confirm(who+"さんの予定と時間が重なります。\n\n"+c.join("\n")+
+    "\n\nこのまま登録しますか？");
+  if(!ok) toast("時間が重なるため登録しませんでした");
+  return ok;
+}
+
+var XLNS = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+function colName(n){
+  var s=""; n=n+1;
+  while(n>0){ var r=(n-1)%26; s=String.fromCharCode(65+r)+s; n=Math.floor((n-1)/26); }
+  return s;
+}
+function exportGrid(){
+  if(!RAW){ toast("先にExcelを読み込んでください"); return; }
+  if(typeof JSZip === "undefined"){ toast("書き出し部品を読み込めませんでした"); return; }
+
+  var warn=[];
+  STAFF.forEach(function(s){ if(overlapsIn(eff(s)).length) warn.push(s.n); });
+  if(warn.length && !confirm("次のスタッフで時間が重なっています。\n重なった訪問は元の表に収まらず、片方が消えます。\n\n"+
+      warn.join("、")+"\n\nこのまま保存しますか？")) return;
+
+  toast("書き出しています…");
+  var spanOf = function(v){ return Math.max(1, Math.round((toMin(v.en)-toMin(v.st))/5)); };
+  var MAXCOL = 200;
+
+  JSZip.loadAsync(RAW).then(function(zip){
+    var path = null;
+    Object.keys(zip.files).forEach(function(f){
+      if(/^xl\/worksheets\/sheet\d+\.xml$/.test(f) && (path===null || f<path)) path=f;
+    });
+    if(!path) throw new Error("シートが見つかりません");
+
+    return zip.file(path).async("string").then(function(xmlText){
+      var doc = new DOMParser().parseFromString(xmlText, "application/xml");
+      if(doc.getElementsByTagName("parsererror").length) throw new Error("シートを解析できません");
+      var sheetData = doc.getElementsByTagName("sheetData")[0];
+      var rowEls = {}, cellEls = {};
+      var rws = sheetData.getElementsByTagName("row");
+      for(var i=0;i<rws.length;i++){
+        var rr = parseInt(rws[i].getAttribute("r"),10)-1;
+        rowEls[rr] = rws[i];
+        var cs = rws[i].getElementsByTagName("c");
+        for(var j=0;j<cs.length;j++) cellEls[cs[j].getAttribute("r")] = cs[j];
+      }
+      var styleAt = function(rr,cc){
+        var el = cellEls[colName(cc)+(rr+1)];
+        return el ? el.getAttribute("s") : null;
+      };
+
+      // 空きセルと帯の書式を元ファイルから借りる
+      var BLANK=[{},{},{},{}], FILLED={};
+      STAFF.forEach(function(s){
+        var base = ROW0 + s.row, busy = {}, c, k, i;
+        s.v.forEach(function(v){
+          var c0=colOf(v.st), sp=spanOf(v);
+          for(var x=c0;x<c0+sp;x++) busy[x]=1;
+        });
+        for(c=3;c<MAXCOL;c++){
+          if(busy[c]) continue;
+          for(k=0;k<4;k++){
+            if(BLANK[k][c]) continue;
+            var st = styleAt(base+k, c);
+            if(st) BLANK[k][c] = st;
+          }
+        }
+        s.v.forEach(function(v){
+          var c0=colOf(v.st), sp=spanOf(v);
+          for(k=0;k<4;k++){
+            for(i=0;i<sp;i++){
+              var pos = (i===0) ? "L" : (i===sp-1 ? "R" : "M");
+              var key = k+"|"+pos;
+              if(FILLED[key]) continue;
+              var st2 = styleAt(base+k, c0+i);
+              if(st2) FILLED[key] = st2;
+            }
+          }
+        });
+      });
+
+      var setCell = function(rr, cc, style, text){
+        var ref = colName(cc)+(rr+1), el = cellEls[ref];
+        if(!el){
+          var row = rowEls[rr];
+          if(!row) return;
+          el = doc.createElementNS(XLNS, "c");
+          el.setAttribute("r", ref);
+          var kids = row.getElementsByTagName("c"), placed = false;
+          for(var q=0;q<kids.length;q++){
+            var m = /^([A-Z]+)/.exec(kids[q].getAttribute("r"))[1], n=0;
+            for(var z=0;z<m.length;z++) n = n*26 + (m.charCodeAt(z)-64);
+            if(n-1 > cc){ row.insertBefore(el, kids[q]); placed = true; break; }
+          }
+          if(!placed) row.appendChild(el);
+          cellEls[ref] = el;
+        }
+        while(el.firstChild) el.removeChild(el.firstChild);
+        el.removeAttribute("t");
+        if(style) el.setAttribute("s", style); else el.removeAttribute("s");
+        if(text !== null && text !== undefined && text !== ""){
+          el.setAttribute("t", "inlineStr");
+          var is = doc.createElementNS(XLNS, "is");
+          var t  = doc.createElementNS(XLNS, "t");
+          t.setAttributeNS("http://www.w3.org/XML/1998/namespace", "xml:space", "preserve");
+          t.appendChild(doc.createTextNode(text));
+          is.appendChild(t); el.appendChild(is);
+        }
+      };
+
+      var setRuns = function(rr, cc, style, runs, fname){
+        setCell(rr, cc, style, null);
+        var el = cellEls[colName(cc)+(rr+1)];
+        if(!el) return;
+        el.setAttribute("t", "inlineStr");
+        var is = doc.createElementNS(XLNS, "is");
+        runs.forEach(function(rn){
+          if(!rn.t) return;
+          var r = doc.createElementNS(XLNS, "r");
+          var pr = doc.createElementNS(XLNS, "rPr");
+          var fn = doc.createElementNS(XLNS, "rFont"); fn.setAttribute("val", fname); pr.appendChild(fn);
+          var cs = doc.createElementNS(XLNS, "charset"); cs.setAttribute("val", "128"); pr.appendChild(cs);
+          var fam = doc.createElementNS(XLNS, "family"); fam.setAttribute("val", "3"); pr.appendChild(fam);
+          if(rn.bold) pr.appendChild(doc.createElementNS(XLNS, "b"));
+          var col = doc.createElementNS(XLNS, "color");
+          col.setAttribute("rgb", rn.color || "FF000000"); pr.appendChild(col);
+          var z = doc.createElementNS(XLNS, "sz"); z.setAttribute("val", String(rn.sz)); pr.appendChild(z);
+          r.appendChild(pr);
+          var t = doc.createElementNS(XLNS, "t");
+          t.setAttributeNS("http://www.w3.org/XML/1998/namespace", "xml:space", "preserve");
+          t.appendChild(doc.createTextNode(rn.t));
+          r.appendChild(t);
+          is.appendChild(r);
+        });
+        el.appendChild(is);
+      };
+      var setRich = function(rr, cc, style, text, fname, tsz, bsz, color){
+        setCell(rr, cc, style, null);
+        var el = cellEls[colName(cc)+(rr+1)];
+        if(!el) return;
+        el.setAttribute("t", "inlineStr");
+        var is = doc.createElementNS(XLNS, "is");
+        var lines = String(text).split(/\r?\n/);
+        var title = lines.shift();
+        var rest = lines.join("\n");
+        var rgb = color || "FF000000";
+        var mkRun = function(str, bold, sz){
+          if(str === "") return null;
+          var r = doc.createElementNS(XLNS, "r");
+          // 要素の順序は rFont → charset → family → b → color → sz でなければならない
+          var pr = doc.createElementNS(XLNS, "rPr");
+          var fn = doc.createElementNS(XLNS, "rFont"); fn.setAttribute("val", fname); pr.appendChild(fn);
+          var cs = doc.createElementNS(XLNS, "charset"); cs.setAttribute("val", "128"); pr.appendChild(cs);
+          var fam = doc.createElementNS(XLNS, "family"); fam.setAttribute("val", "3"); pr.appendChild(fam);
+          if(bold) pr.appendChild(doc.createElementNS(XLNS, "b"));
+          var col = doc.createElementNS(XLNS, "color"); col.setAttribute("rgb", rgb); pr.appendChild(col);
+          var z = doc.createElementNS(XLNS, "sz"); z.setAttribute("val", String(sz)); pr.appendChild(z);
+          r.appendChild(pr);
+          var t = doc.createElementNS(XLNS, "t");
+          t.setAttributeNS("http://www.w3.org/XML/1998/namespace", "xml:space", "preserve");
+          t.appendChild(doc.createTextNode(str));
+          r.appendChild(t);
+          return r;
+        };
+        var r1 = mkRun(title, true, tsz);
+        if(r1) is.appendChild(r1);
+        var r2 = mkRun(rest ? "\n"+rest : "", false, bsz);
+        if(r2) is.appendChild(r2);
+        el.appendChild(is);
+      };
+
+      STAFF.forEach(function(s){
+        var base = ROW0 + s.row;
+        var before = s.v, after = eff(s);
+        var keep = {}, had = {};
+        after.forEach(function(v){ keep[sig(v)] = 1; });
+        before.forEach(function(v){ had[sig(v)] = 1; });
+
+        before.forEach(function(v){
+          if(keep[sig(v)]) return;
+          var c0=colOf(v.st), sp=spanOf(v);
+          for(var k=0;k<4;k++)
+            for(var i=0;i<sp;i++) setCell(base+k, c0+i, BLANK[k][c0+i], null);
+        });
+
+        after.forEach(function(v){
+          if(had[sig(v)]) return;
+          var c0=colOf(v.st), sp=spanOf(v);
+          var vals = [v.st+"-"+v.en, v.u, v.s];
+          for(var k=0;k<4;k++){
+            for(var i=0;i<sp;i++){
+              var pos = (i===0) ? "L" : (i===sp-1 ? "R" : "M");
+              setCell(base+k, c0+i, FILLED[k+"|"+pos] || BLANK[k][c0+i],
+                      (k<3 && i===0) ? vals[k] : null);
+            }
+          }
+        });
+      });
+
+      // スタッフ名の右に配車の枠を作る（D列〜O列 × 4行）
+      var CAR_C0 = 3, CAR_C1 = 14;
+      // 枠の幅（12列 ≒ 半角16.5文字ぶん）に収まる大きさを求める
+      var carSize = function(code){
+        var n = 0;
+        for(var i=0;i<code.length;i++) n += (code.charCodeAt(i) > 255) ? 2 : 1;
+        if(n < 1) n = 1;
+        var s = Math.floor(180 / n);
+        if(s > 22) s = 22;
+        if(s < 9) s = 9;
+        return s;
+      };
+      var anyCar = STAFF.some(function(s){ return (CAR[s.n]||"").trim(); });
+
+      // 予定表の右に備考の枠を作る
+      var NOTE_C0 = 195, NOTE_C1 = 214, NOTE_R0 = 5, NOTE_H = 12;
+      var blocks = NOTES.map(function(b){ return String(b||"").replace(/^\s+|\s+$/g, ""); })
+        .filter(function(b){ return b.length; });
+
+      return zip.file("xl/styles.xml").async("string").then(function(stylesText){
+        var sdoc = new DOMParser().parseFromString(stylesText, "application/xml");
+        var fontName = "ＭＳ Ｐゴシック", baseSz = 11;
+        try{
+          var xf0 = sdoc.getElementsByTagName("cellXfs")[0]
+            .getElementsByTagName("xf")[parseInt(BLANK[0][10]||BLANK[0][20]||"0",10)];
+          var f0 = sdoc.getElementsByTagName("fonts")[0]
+            .getElementsByTagName("font")[parseInt(xf0.getAttribute("fontId")||"0",10)];
+          var n0 = f0.getElementsByTagName("name")[0], z0 = f0.getElementsByTagName("sz")[0];
+          if(n0 && n0.getAttribute("val")) fontName = n0.getAttribute("val");
+          if(z0 && z0.getAttribute("val")) baseSz = parseFloat(z0.getAttribute("val"));
+        }catch(e){}
+
+        // 同じ利用者が同じ時間に入っている訪問を拾う（2人体制・同行を含む）
+        var flags = {}, allV = [];
+        STAFF.forEach(function(s){
+          if(SKIP[s.n]) return;
+          eff(s).forEach(function(v){ allV.push({n:s.n, row:ROW0+s.row, v:v}); });
+        });
+        for(var a=0;a<allV.length;a++){
+          for(var b2=a+1;b2<allV.length;b2++){
+            var x = allV[a], y = allV[b2];
+            if(x.v.u !== y.v.u) continue;
+            if(!(toMin(x.v.st) < toMin(y.v.en) && toMin(y.v.st) < toMin(x.v.en))) continue;
+            flags[x.row+"|"+colOf(x.v.st)] = x.v.u;
+            flags[y.row+"|"+colOf(y.v.st)] = y.v.u;
+          }
+        }
+        if(Object.keys(flags).length){
+          // 蛍光ペン用の塗りと、それを使う書式を用意する
+          var fillsEl = sdoc.getElementsByTagName("fills")[0];
+          var pf = sdoc.createElementNS(XLNS, "patternFill");
+          pf.setAttribute("patternType", "solid");
+          var fg = sdoc.createElementNS(XLNS, "fgColor"); fg.setAttribute("rgb", "FFFCEE7A"); pf.appendChild(fg);
+          var bgc = sdoc.createElementNS(XLNS, "bgColor"); bgc.setAttribute("rgb", "FFFCEE7A"); pf.appendChild(bgc);
+          var fl = sdoc.createElementNS(XLNS, "fill"); fl.appendChild(pf);
+          fillsEl.appendChild(fl);
+          var markFill = fillsEl.getElementsByTagName("fill").length - 1;
+          fillsEl.setAttribute("count", String(markFill + 1));
+
+          var xfsEl = sdoc.getElementsByTagName("cellXfs")[0];
+          var markCache = {};
+          var markStyle = function(src){
+            var key = String(src == null ? "-" : src);
+            if(markCache[key] !== undefined) return markCache[key];
+            var base = xfsEl.getElementsByTagName("xf")[parseInt(key,10)];
+            var el = sdoc.createElementNS(XLNS, "xf");
+            if(base){
+              for(var a2=0;a2<base.attributes.length;a2++){
+                var at = base.attributes[a2];
+                el.setAttribute(at.name, at.value);
+              }
+              for(var c2=0;c2<base.childNodes.length;c2++)
+                el.appendChild(base.childNodes[c2].cloneNode(true));
+            }else{
+              el.setAttribute("numFmtId","0"); el.setAttribute("fontId","0");
+              el.setAttribute("borderId","0"); el.setAttribute("xfId","0");
+            }
+            el.setAttribute("fillId", String(markFill));
+            el.setAttribute("applyFill", "1");
+            xfsEl.appendChild(el);
+            var idx = xfsEl.getElementsByTagName("xf").length - 1;
+            xfsEl.setAttribute("count", String(idx + 1));
+            markCache[key] = String(idx);
+            return markCache[key];
+          };
+
+          // 名前の文字数から、塗る列数を見積もる
+          var widthOf = function(str){
+            var n = 0;
+            for(var q=0;q<str.length;q++) n += (str.charCodeAt(q) > 255) ? 2 : 1;
+            return n;
+          };
+          STAFF.forEach(function(s){
+            if(SKIP[s.n]) return;
+            var base2 = ROW0 + s.row, list = eff(s);
+            var starts = {};
+            list.forEach(function(v){ starts[colOf(v.st)] = 1; });
+            list.forEach(function(v){
+              var c0 = colOf(v.st);
+              if(!flags[base2+"|"+c0]) return;
+              var pn = partnerOf(s, v);
+              var label = (pn ? "同　" : "") + v.u;
+              var need = Math.max(1, Math.ceil(widthOf(label) / 1.375));
+              for(var c=c0; c<c0+need; c++){
+                if(c > c0 && starts[c]) break;          // 次の訪問には掛からない
+                var st2 = markStyle(styleAt(base2+1, c));
+                if(c !== c0){ setCell(base2+1, c, st2, null); continue; }
+                if(pn){
+                  setRuns(base2+1, c, st2, [
+                    {t:"同　", bold:true,  sz:baseSz, color:"FFC00000"},
+                    {t:v.u,   bold:false, sz:baseSz, color:"FF000000"}
+                  ], fontName);
+                }else{
+                  setCell(base2+1, c, st2, v.u);
+                }
+              }
+            });
+          });
+        }
+
+
+        if((blocks.length || anyCar) && stylesText){
+          var borders = sdoc.getElementsByTagName("borders")[0];
+          var cellXfs = sdoc.getElementsByTagName("cellXfs")[0];
+
+          // 見本にする書式（フォントなどを引き継ぐ）
+          var baseXf = null, baseIdx = BLANK[0][10] || BLANK[0][20];
+          var xfList = cellXfs.getElementsByTagName("xf");
+          if(baseIdx !== undefined && xfList[parseInt(baseIdx,10)]) baseXf = xfList[parseInt(baseIdx,10)];
+          var fontId = baseXf ? (baseXf.getAttribute("fontId")||"0") : "0";
+          var numFmtId = baseXf ? (baseXf.getAttribute("numFmtId")||"0") : "0";
+
+          var side = function(name, on){
+            var e = sdoc.createElementNS(XLNS, name);
+            if(on){
+              e.setAttribute("style", "thin");
+              var col = sdoc.createElementNS(XLNS, "color");
+              col.setAttribute("rgb", "FF000000");
+              e.appendChild(col);
+            }
+            return e;
+          };
+          var addBorder = function(l,r,t,b){
+            var el = sdoc.createElementNS(XLNS, "border");
+            el.appendChild(side("left",l));
+            el.appendChild(side("right",r));
+            el.appendChild(side("top",t));
+            el.appendChild(side("bottom",b));
+            el.appendChild(sdoc.createElementNS(XLNS, "diagonal"));
+            borders.appendChild(el);
+            var n = borders.getElementsByTagName("border").length;
+            borders.setAttribute("count", String(n));
+            return n-1;
+          };
+          var addXf = function(borderId, align){
+            var el = sdoc.createElementNS(XLNS, "xf");
+            el.setAttribute("numFmtId", numFmtId);
+            el.setAttribute("fontId", fontId);
+            el.setAttribute("fillId", "0");
+            el.setAttribute("borderId", String(borderId));
+            el.setAttribute("xfId", "0");
+            el.setAttribute("applyBorder", "1");
+            el.setAttribute("applyFont", "1");
+            if(align){
+              el.setAttribute("applyAlignment", "1");
+              var a = sdoc.createElementNS(XLNS, "alignment");
+              a.setAttribute("horizontal", "center");
+              a.setAttribute("vertical", "center");
+              a.setAttribute("wrapText", "1");
+              el.appendChild(a);
+            }
+            cellXfs.appendChild(el);
+            var n = cellXfs.getElementsByTagName("xf").length;
+            cellXfs.setAttribute("count", String(n));
+            return n-1;
+          };
+
+          var TITLE_SZ = baseSz + 3, BODY_SZ = baseSz + 1;
+
+          var S = {};
+          S.TL = addXf(addBorder(1,1,1,1), true);   // 結合セルは左上の罫線で描かれる
+          S.T  = addXf(addBorder(0,0,1,0), false);
+          S.TR = addXf(addBorder(0,1,1,0), false);
+          S.L  = addXf(addBorder(1,0,0,0), false);
+          S.R  = addXf(addBorder(0,1,0,0), false);
+          S.BL = addXf(addBorder(1,0,0,1), false);
+          S.B  = addXf(addBorder(0,0,0,1), false);
+          S.BR = addXf(addBorder(0,1,0,1), false);
+
+          var mc = doc.getElementsByTagName("mergeCells")[0];
+
+          blocks.forEach(function(text, bi){
+            var r0 = NOTE_R0 + NOTE_H*bi, r1 = r0 + NOTE_H - 1;
+            for(var rr=r0; rr<=r1; rr++){
+              if(!rowEls[rr]){
+                var row = doc.createElementNS(XLNS, "row");
+                row.setAttribute("r", String(rr+1));
+                sheetData.appendChild(row);
+                rowEls[rr] = row;
+              }
+              for(var cc=NOTE_C0; cc<=NOTE_C1; cc++){
+                var isT = (rr===r0), isB = (rr===r1);
+                var isL = (cc===NOTE_C0), isR = (cc===NOTE_C1);
+                var key = (isT?"T":(isB?"B":"")) + (isL?"L":(isR?"R":""));
+                if(!key) continue;
+                  if(rr===r0 && cc===NOTE_C0) setRich(rr, cc, String(S[key]), text, fontName, TITLE_SZ, BODY_SZ);
+                else setCell(rr, cc, String(S[key]), null);
+              }
+            }
+            if(mc){
+              var m = doc.createElementNS(XLNS, "mergeCell");
+              m.setAttribute("ref", colName(NOTE_C0)+(r0+1)+":"+colName(NOTE_C1)+(r1+1));
+              mc.appendChild(m);
+              mc.setAttribute("count", String(mc.getElementsByTagName("mergeCell").length));
+            }
+          });
+
+          // ---- 配車の枠 ----
+          if(anyCar){
+            // 結合した範囲は、全セルが同じ書式でなければ罫線が正しく出ない
+            var carStyle = String(addXf(addBorder(1,0,1,1), true));
+            STAFF.forEach(function(s){
+              var base = ROW0 + s.row;
+              var code = (CAR[s.n]||"").trim() || "-";
+              for(var k=0;k<4;k++){
+                for(var cc=CAR_C0; cc<=CAR_C1; cc++){
+                  if(k===0 && cc===CAR_C0)
+                    setRich(base, cc, carStyle, code, fontName, carSize(code), carSize(code));
+                  else
+                    setCell(base+k, cc, carStyle, null);
+                }
+              }
+              if(mc){
+                var cm = doc.createElementNS(XLNS, "mergeCell");
+                cm.setAttribute("ref", colName(CAR_C0)+(base+1)+":"+colName(CAR_C1)+(base+4));
+                mc.appendChild(cm);
+                mc.setAttribute("count", String(mc.getElementsByTagName("mergeCell").length));
+              }
+            });
+          }
+
+          var dim2 = doc.getElementsByTagName("dimension")[0];
+          if(dim2){
+            var lastR = NOTE_R0 + NOTE_H*blocks.length;
+            var d2 = /^([A-Z]+\d+):([A-Z]+)(\d+)$/.exec(dim2.getAttribute("ref")||"");
+            if(d2) dim2.setAttribute("ref", d2[1]+":"+colName(NOTE_C1)+Math.max(parseInt(d2[3],10), lastR));
+          }
+        }
+        zip.file("xl/styles.xml", new XMLSerializer().serializeToString(sdoc));
+
+        zip.file(path, new XMLSerializer().serializeToString(doc));
+        return zip.generateAsync({type:"blob", compression:"DEFLATE"});
+      });
+    });
+  }).then(function(blob){
+    offerFile(blob, "スタッフ日毎スケジュール表_"+String(KEYDAY).replace("/","-")+"_変更後.xlsx");
+  }).catch(function(err){
+    toast("書き出しに失敗しました");
+    console.error(err);
+  });
+}
+
+var PENDING = null;
+function offerFile(blob, name){
+  if(PENDING && PENDING.url) URL.revokeObjectURL(PENDING.url);
+  PENDING = { blob:blob, name:name, url:URL.createObjectURL(blob) };
+  var el = document.getElementById("dlbar");
+  if(!el){
+    el = document.createElement("div");
+    el.id = "dlbar"; el.className = "dlbar";
+    document.body.appendChild(el);
+  }
+  var canShare = false;
+  try{
+    canShare = !!(navigator.canShare && navigator.canShare({files:[new File([blob], name)]}));
+  }catch(e){ canShare = false; }
+  el.innerHTML =
+    '<span class="dlmsg">Excelができました</span>'+
+    '<a class="dlbtn" href="'+PENDING.url+'" download="'+esc(name)+'" '+
+      'onclick="setTimeout(closeDl,1200)">保存</a>'+
+    (canShare ? '<button class="dlbtn alt" onclick="shareFile()">共有</button>' : '')+
+    '<button class="dlx" onclick="closeDl()" aria-label="閉じる">✕</button>';
+  el.style.display = "flex";
+  toast("下の「保存」を押してください");
+}
+function shareFile(){
+  if(!PENDING) return;
+  try{
+    var f = new File([PENDING.blob], PENDING.name,
+      {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+    navigator.share({files:[f]}).then(function(){ closeDl(); }).catch(function(){});
+  }catch(e){ toast("共有できませんでした"); }
+}
+function closeDl(){
+  var el = document.getElementById("dlbar");
+  if(el) el.style.display = "none";
+  if(PENDING && PENDING.url){ URL.revokeObjectURL(PENDING.url); }
+  PENDING = null;
+}
+
+function allText(){
+  var out = [];
+  STAFF.forEach(function(s,i){
+    if(SKIP[s.n]) return;
+    var prev = BASE[s.n], d = prev ? diff(prev, eff(s)) : null;
+    var mode = buckets(s, d).any ? "chg" : "full";
+    out.push("━━━━━ "+s.n+" ━━━━━\n" + textOf(i, mode));
+  });
+  return out.join("\n\n");
+}
+function copyAll(){
+  var t = allText();
+  if(!t){ toast("送信対象のスタッフがいません"); return; }
+  var n = t.split("━━━━━").length - 1;
+  var done = function(){ toast(Math.floor(n/2)+"名分をコピーしました"); };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(t).then(done).catch(function(){ fallbackAll(t, done); });
+    return;
+  }
+  fallbackAll(t, done);
+}
+function fallbackAll(t, done){
+  var ta=document.createElement("textarea");
+  ta.value=t; ta.style.cssText="position:fixed;top:0;left:0;opacity:0";
+  document.body.appendChild(ta); ta.select();
+  try{ document.execCommand("copy"); ta.remove(); done(); }
+  catch(e){ ta.remove(); toast("コピーできませんでした"); }
+}
+function resetAll(){
+  if(confirm(DAY+"の送信記録をすべて消しますか？\n全員が「未送信」に戻ります。")){
+    BASE={}; save(); render();
+  }
+}
+
+/* ---- ファイル ---- */
+function load(file){
+  var fr=new FileReader();
+  fr.onload = function(e){
+    try{
+      RAW = new Uint8Array(e.target.result);
+      var wb = XLSX.read(RAW, {type:"array"});
+      var ws = wb.Sheets[wb.SheetNames[0]];
+      ROW0 = ws["!ref"] ? XLSX.utils.decode_range(ws["!ref"]).s.r : 0;
+      var rows = XLSX.utils.sheet_to_json(ws,{header:1,raw:false,defval:null,blankrows:true});
+      var r = parse(rows);
+      if(r.multi){
+        var f = function(d){ return (d.getMonth()+1)+"/"+d.getDate(); };
+        document.getElementById("out").innerHTML =
+          '<div class="err"><b>1日分のExcelを読み込んでください</b>'+
+          'このファイルは '+esc(f(r.dobj))+' 〜 '+esc(f(r.dobj2))+' の複数日分です。'+
+          '複数日をまとめて読むと、同じスタッフの予定が上書きされて正しく送れません。<br>'+
+          '介護ソフトで期間を1日にして書き出し直してください。</div>';
+        return;
+      }
+      if(r.dup && r.dup.length){
+        document.getElementById("out").innerHTML =
+          '<div class="err"><b>同じスタッフが複数回出てきます</b>'+
+          esc(r.dup.join("、"))+'<br>'+
+          '複数日分か、様式が想定と違う可能性があります。1日分のファイルか確認してください。</div>';
+        return;
+      }
+      if(!r.staff.length){
+        document.getElementById("out").innerHTML =
+          '<div class="err">スタッフ名と訪問予定が見つかりませんでした。<br>'+
+          '「スタッフ日毎スケジュール表」の書き出しに合わせています。別の様式の場合は調整が必要です。</div>';
+        return;
+      }
+      STAFF=r.staff; DAY=r.day||""; KEYDAY=r.key||DAY; DATEOBJ=r.dobj;
+      try{ localStorage.setItem("staffnames",
+        JSON.stringify(STAFF.map(function(s){ return s.n; }))); }catch(e){}
+      tidyStorage();
+      var svcs={};
+      STAFF.forEach(function(s){ s.v.forEach(function(v){ if(v.s) svcs[v.s]=1; }); });
+      document.getElementById("svclist").innerHTML =
+        Object.keys(svcs).sort().map(function(x){ return '<option value="'+esc(x)+'">'; }).join("");
+      loadState();
+      document.getElementById("drop").style.display="none";
+      CAROPEN = false;
+      render();
+    }catch(err){
+      document.getElementById("out").innerHTML =
+        '<div class="err">ファイルを読み込めませんでした。<br>'+esc(err.message||err)+'</div>';
+    }
+  };
+  fr.readAsArrayBuffer(file);
+}
+renderHome();
+document.getElementById("file").addEventListener("change",function(e){ if(e.target.files[0]) load(e.target.files[0]); });
+var drop=document.getElementById("drop");
+["dragenter","dragover"].forEach(function(ev){ drop.addEventListener(ev,function(e){ e.preventDefault(); drop.classList.add("over"); }); });
+["dragleave","drop"].forEach(function(ev){ drop.addEventListener(ev,function(e){ e.preventDefault(); drop.classList.remove("over"); }); });
+drop.addEventListener("drop",function(e){ var f=e.dataTransfer.files[0]; if(f) load(f); });
+</script>
+</body>
+</html>
