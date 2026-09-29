@@ -449,7 +449,10 @@ function renderHome(){
     var cl = JSON.parse(localStorage.getItem("carlist")||"null");
     if(cl instanceof Array && cl.length) CARLIST = cl;
   }catch(e){}
-  if(!HOMENAMES.length){ document.getElementById("out").innerHTML = ""; return; }
+  var forgetBtn = ownedKeys().length
+    ? '<button class="clearbtn" style="margin-top:16px" onclick="forgetAll()">保存した内容をすべて消す</button>'
+    : "";
+  if(!HOMENAMES.length){ document.getElementById("out").innerHTML = forgetBtn; return; }
 
   var nCar = 0;
   HOMENAMES.forEach(function(n){ if((CAR[n]||"").trim()) nCar++; });
@@ -471,7 +474,7 @@ function renderHome(){
         }).join("")+
         '<button class="clearbtn" onclick="clearCars(true)">配車をすべて消す</button>'+
         '<button class="clearbtn quiet" onclick="resetCarList(true)">候補一覧を最初に戻す</button>'+
-      '</div>');
+      '</div>') + forgetBtn;
 }
 function toggleCarHome(){ CAROPEN = !CAROPEN; renderHome(); }
 function setNote(i,v){ NOTES[i] = v; save(); }
@@ -1015,6 +1018,7 @@ function render(){
       '<button onclick="exportGrid()">変更後のExcel（元の形式）</button>'+
       '<button onclick="markAll()">全員を送信済みにする</button>'+
       '<button class="danger" onclick="resetAll()">送信の記録を消す</button>'+
+      '<button class="danger" onclick="forgetAll()">保存した内容をすべて消す</button>'+
       '<button onclick="location.reload()">別のファイルを読む</button>'+
     '</div>';
 }
@@ -1704,6 +1708,52 @@ function resetAll(){
   if(confirm(DAY+"の送信記録をすべて消しますか？\n全員が「未送信」に戻ります。")){
     BASE={}; save(); render();
   }
+}
+
+/* ---- 保存した内容をすべて消す ---- */
+var OWNED = /^(base|memo|man|note|pair|edit)_/;
+var OWNED_FIXED = ["tpl","skip","cars","carlist","staffnames"];
+function ownedKeys(){
+  var out = [];
+  try{
+    for(var i=0;i<localStorage.length;i++){
+      var k = localStorage.key(i);
+      if(OWNED.test(k) || OWNED_FIXED.indexOf(k) >= 0) out.push(k);
+    }
+  }catch(e){}
+  return out;
+}
+function storedSummary(){
+  var keys = ownedKeys(), days = {}, n = {cars:0, names:0, tpl:false, skip:0};
+  keys.forEach(function(k){
+    var m = k.match(OWNED);
+    if(m){ days[k.replace(OWNED,"")] = 1; return; }
+    try{
+      var v = JSON.parse(localStorage.getItem(k) || "null");
+      if(k === "cars" && v) for(var x in v){ if((v[x]||"").trim()) n.cars++; }
+      if(k === "staffnames" && v instanceof Array) n.names = v.length;
+      if(k === "skip" && v) for(var y in v) n.skip++;
+      if(k === "tpl" && v) n.tpl = true;
+    }catch(e){}
+  });
+  n.days = Object.keys(days).length;
+  n.keys = keys.length;
+  return n;
+}
+function forgetAll(){
+  var n = storedSummary();
+  if(!n.keys){ toast("消すものはありません"); return; }
+  var lines = [];
+  if(n.days)  lines.push("・送信の記録と手作業の変更　" + n.days + "日分");
+  if(n.cars)  lines.push("・配車　" + n.cars + "名分");
+  if(n.skip)  lines.push("・送信しない人の設定　" + n.skip + "名");
+  if(n.tpl)   lines.push("・冒頭と結びの定型文");
+  if(n.names) lines.push("・前回のスタッフ名　" + n.names + "名");
+  if(!confirm("この端末に保存した内容をすべて消します。\n\n" + lines.join("\n") +
+      "\n\n消すと元に戻せません。続けますか？")) return;
+  if(!confirm("本当に消しますか？\nこのあと画面は最初の状態に戻ります。")) return;
+  try{ ownedKeys().forEach(function(k){ localStorage.removeItem(k); }); }catch(e){}
+  location.reload();
 }
 
 /* ---- ファイル ---- */
