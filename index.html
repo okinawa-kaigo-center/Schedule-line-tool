@@ -289,7 +289,42 @@ function toast(msg){
   t.textContent=msg; t.classList.add("on");
   clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("on"),2400);
 }
+/* ---- 同じ端末で開いているほかの画面（タブ）との食い違いを防ぐ ----
+   「保存した内容をすべて消す」をしても、前から開いたままの別のタブが
+   覚えている配車などを保存し直すと、消したはずの内容が戻ってしまう。
+   消した時刻（forgot_at）を残し、それより前に開いた画面は保存せずに読み込み直す。
+   配車をほかのタブで変えたときも、こちらの画面の配車をそれに合わせる。 */
+var LOADED_AT = Date.now();
+function staleTab(){
+  try{
+    var f = +(localStorage.getItem("forgot_at") || 0);
+    if(f > LOADED_AT){ location.reload(); return true; }
+  }catch(e){}
+  return false;
+}
+function syncCarsFromStorage(){
+  try{ CAR = JSON.parse(localStorage.getItem("cars")||"{}") || {}; }catch(e){ CAR = {}; }
+  try{
+    var cl = JSON.parse(localStorage.getItem("carlist")||"null");
+    CARLIST = (cl instanceof Array && cl.length) ? cl : CARLIST_DEFAULT.slice();
+  }catch(e){}
+}
+window.addEventListener("storage", function(e){
+  if(e.key === null || e.key === "forgot_at"){ location.reload(); return; }
+  if(e.key === "cars" || e.key === "carlist"){
+    syncCarsFromStorage();
+    if(STAFF.length) render(); else renderHome();
+  }
+});
+document.addEventListener("visibilitychange", function(){
+  if(document.visibilityState !== "visible" || staleTab()) return;
+  var before = JSON.stringify(CAR);
+  syncCarsFromStorage();
+  if(JSON.stringify(CAR) !== before){ if(STAFF.length) render(); else renderHome(); }
+});
+
 function save(){
+  if(staleTab()) return;
   try{
     localStorage.setItem("base_"+KEYDAY, JSON.stringify(BASE));
     localStorage.setItem("man_"+KEYDAY, JSON.stringify(MAN));
@@ -1030,6 +1065,7 @@ function setCarName(n,val){
   if(STAFF.length) render(); else renderHome();
 }
 function saveCars(){
+  if(staleTab()) return;
   try{
     localStorage.setItem("cars", JSON.stringify(CAR));
     localStorage.setItem("carlist", JSON.stringify(CARLIST));
@@ -1753,6 +1789,8 @@ function forgetAll(){
       "\n\n消すと元に戻せません。続けますか？")) return;
   if(!confirm("本当に消しますか？\nこのあと画面は最初の状態に戻ります。")) return;
   try{ ownedKeys().forEach(function(k){ localStorage.removeItem(k); }); }catch(e){}
+  // ほかのタブに「消した」ことを知らせる（その時刻より前に開いた画面は、保存せずに読み込み直す）
+  try{ localStorage.setItem("forgot_at", String(Date.now())); }catch(e){}
   location.reload();
 }
 
