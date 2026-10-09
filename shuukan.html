@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>週間プランの照合｜沖縄介護センター</title>
+<meta name="theme-color" content="#0B4F6C">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#E9EDEE; --card:#FFFFFF; --ink:#16262B; --muted:#67797F;
+  --line:#DDE4E6; --accent:#0E5A61;
+  --warn:#C2410C; --warn-bg:#FFF3E6; --warn-br:#F3C18E;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"BIZ UDPGothic","Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
+  font-size:16px; line-height:1.5; -webkit-text-size-adjust:100%;
+  padding-bottom:calc(48px + env(safe-area-inset-bottom));
+}
+.wrap{max-width:720px;margin:0 auto;padding:0 12px}
+header{background:var(--accent);color:#fff;padding:calc(14px + env(safe-area-inset-top)) 0 15px}
+header .wrap{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.htitle{font-size:17px;font-weight:700}
+.horg{font-size:12.5px;opacity:.75}
+.back{margin-left:auto;color:#fff;font-size:13px;opacity:.85}
+
+.hint{background:#E9F1F5;border:1px solid #BBD3E0;color:#134B66;border-radius:10px;padding:12px 14px;margin:16px 0 0;font-size:13.5px;line-height:1.8}
+.drop{margin:14px 0 0;padding:22px 16px;background:var(--card);border:2px dashed #B7C4CC;border-radius:12px;text-align:center}
+.drop.over{border-color:var(--accent);background:#E9F1F5}
+.drop p{margin:0 0 12px;font-size:14.5px;color:var(--muted);line-height:1.8}
+.pick{display:inline-block;padding:13px 26px;background:var(--accent);color:#fff;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer}
+input[type=file]{position:absolute;width:1px;height:1px;opacity:0}
+
+.bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:14px 2px 0;font-size:13.5px;color:var(--muted)}
+.bar select{padding:7px 8px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:14px;background:#fff;color:var(--ink)}
+.bar button{padding:7px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--accent);font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:10px 2px 0}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:4px 6px 4px 11px;border-radius:99px;background:#DCEDEE;color:var(--accent);font-size:13px}
+.chip button{background:none;border:none;color:var(--accent);font-size:15px;padding:0 4px;cursor:pointer}
+
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:10px}
+.card.has{border-color:var(--warn-br)}
+.chead{display:flex;align-items:center;gap:8px}
+.nm{font-size:16.5px;font-weight:700}
+.tag{font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:99px;margin-left:auto;white-space:nowrap}
+.tag.ok{background:#E4F3E9;color:#1B8A4B}
+.tag.chg{background:var(--warn-bg);color:var(--warn)}
+.tag.no{background:#EEF1F3;color:var(--muted)}
+.sub{font-size:12.5px;color:var(--muted);margin-top:3px;line-height:1.7}
+.day{margin-top:10px}
+.dlab{font-size:13px;font-weight:700;color:var(--accent);border-bottom:1px solid #EEF1F3;padding-bottom:3px}
+.item{display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed var(--line);cursor:pointer}
+.item input{flex:0 0 auto;width:20px;height:20px;margin:2px 0 0;accent-color:var(--accent)}
+.item .tx{flex:1;min-width:0;font-size:14.5px;line-height:1.65}
+.item .who{font-weight:700}
+.item .k{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 7px;border-radius:99px;margin-right:6px;vertical-align:1px}
+.k.t{background:var(--warn-bg);color:var(--warn)}
+.k.a{background:#E3EEFB;color:#1D4F91}
+.k.m{background:#FDECEC;color:#8A2222}
+.item .n{color:var(--muted);font-size:12.5px;white-space:nowrap}
+.item .note{display:block;color:var(--muted);font-size:12.5px}
+.item.done .tx{color:#93A2AB;text-decoration:line-through}
+.dnote{font-size:12.5px;color:var(--muted);padding:5px 0}
+details.tmp{margin-top:10px}
+details.tmp summary{font-size:13px;color:var(--muted);cursor:pointer}
+details.tmp ul{margin:6px 0 0;padding-left:18px;font-size:13px;color:var(--muted);line-height:1.8}
+.err{background:#FDECEC;border:1px solid #F0B8B8;color:#8A2222;border-radius:10px;padding:12px 14px;margin-top:12px;font-size:14px;line-height:1.7}
+.foot{margin:22px 2px 0;font-size:12.5px;color:var(--muted);line-height:1.8}
+button:focus-visible,input:focus-visible,label:focus-within,select:focus-visible{outline:3px solid #F2A93B;outline-offset:2px}
+@media print{
+  body{background:#fff;padding:0;font-size:12px}
+  header,.hint,.drop,.bar button,.chips,.foot,.noprint{display:none !important}
+  .card{break-inside:avoid;border-color:#999}
+  details.tmp{display:none}
+}
+</style>
+</head>
+<body>
+
+<header><div class="wrap">
+  <span class="htitle">週間プランの照合</span>
+  <span class="horg">沖縄介護センター</span>
+  <a class="back" href="./">← スケジュール作成へ</a>
+</div></header>
+
+<div class="wrap">
+  <div class="hint">
+    介舟の「スタッフ週間プラン」（Excel）を読み込むと、このツールで<b>ヘルパーさんに送った予定</b>（実際に確定した予定）と曜日ごとに比べ、<b>週間プランを直す候補</b>を出します。<br>
+    月末にこの一覧を見ながら介舟の週間計画を直すと、翌月の予定が元の時刻に戻らなくなります。<br>
+    いつもLINEの送信に使っている端末・ブラウザで開いてください（送った記録はその端末にだけ残っています）。
+  </div>
+  <div class="drop" id="drop">
+    <p>スタッフ週間プランのExcelを選んでください。<br>何人分でもまとめて選べます。</p>
+    <label class="pick" tabindex="0">
+      週間プランを選ぶ
+      <input type="file" id="file" accept=".xlsx,.xls" multiple>
+    </label>
+  </div>
+  <div id="out"></div>
+  <p class="foot">
+    ファイルはこの端末の中だけで処理され、どこにも送信されません。読み込んだ週間プランは保存しません（画面を閉じると消えます）。<br>
+    照合は「時刻」と「利用者名」で行います。サービス名は書き方が違うことがあるため参考として表示するだけです。
+  </p>
+</div>
+
+<script>
+var DOWJ = ["日","月","火","水","木","金","土"];
+var ORDER = [1,2,3,4,5,6,0];
+var TIME = /^\s*\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}\s*$/;
+var PLANS = [];          // {name, key, file, items:[{w,st,en,u,s}]}
+var WEEKS = 4;
+var DONE = {};
+var ERRS = [];
+
+function esc(s){ return String(s).replace(/[&<>"]/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m];}); }
+function clean(s){ return String(s==null?"":s).replace(/\u3000/g," ").replace(/\s+/g," ").trim(); }
+function norm(s){ return String(s==null?"":s).replace(/[\s\u3000]/g,"").replace(/様$/,""); }
+function toMin(t){ var p=String(t).split(":").map(Number); return p[0]*60+p[1]; }
+function pad(n){ return (n<10?"0":"")+n; }
+function hm(m){ return Math.floor(m/60)+":"+pad(m%60); }
+function tlab(v){ return hm(toMin(v.st))+"-"+hm(toMin(v.en)); }
+function tkey(v){ return toMin(v.st)+"-"+toMin(v.en); }
+function same(a,b){ return norm(a.u)===norm(b.u); }
+function sama(u){ return esc(u)+" 様"; }
+
+/* ---- 週間プランの読み取り ---- */
+function parsePlan(rows){
+  var out = [], cur = null, colmap = null;
+  rows.forEach(function(row){
+    row = row || [];
+    var cm = {}, hits = 0;
+    row.forEach(function(c,j){
+      var t = clean(c);
+      if(t.length===1 && DOWJ.indexOf(t)>=0){ cm[j] = DOWJ.indexOf(t); hits++; }
+    });
+    if(hits >= 5){ colmap = cm; return; }
+    for(var j=0;j<row.length;j++){
+      var raw = String(row[j]==null?"":row[j]);
+      if(/\n/.test(raw)) continue;
+      var t = clean(raw);
+      if(/様$/.test(t) && t.length <= 24){
+        cur = {name: t.replace(/\s*様$/,""), items: []};
+        out.push(cur); colmap = null;
+        return;
+      }
+    }
+    if(!cur || !colmap) return;
+    Object.keys(colmap).forEach(function(j){
+      var lines = String(row[j]==null?"":row[j]).split(/\r?\n/).map(clean);
+      if(!TIME.test(lines[0]||"")) return;
+      var u = lines[1]||"";
+      if(!u || /^担\s*会/.test(u)) return;
+      var p = lines[0].split("-");
+      cur.items.push({w:colmap[j], st:p[0].trim(), en:p[1].trim(), u:u, s:lines[2]||""});
+    });
+  });
+  return out;
+}
+
+function addFiles(files){
+  ERRS = [];
+  var list = Array.prototype.slice.call(files||[]);
+  if(!list.length) return;
+  var left = list.length;
+  list.forEach(function(f){
+    var rd = new FileReader();
+    rd.onload = function(e){
+      try{
+        var wb = XLSX.read(new Uint8Array(e.target.result), {type:"array"});
+        var got = [];
+        wb.SheetNames.forEach(function(sn){
+          var rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1, defval:"", raw:false});
+          got = got.concat(parsePlan(rows));
+        });
+        if(!got.length) ERRS.push(f.name+"：スタッフ週間プランとして読み取れませんでした（スタッフ名「〇〇 様」と曜日の見出しが見つかりません）");
+        got.forEach(function(p){
+          p.key = norm(p.name); p.file = f.name;
+          PLANS = PLANS.filter(function(q){ return q.key!==p.key; });
+          PLANS.push(p);
+        });
+      }catch(err){ ERRS.push(f.name+"：読み込めませんでした（"+err.message+"）"); }
+      if(--left===0) render();
+    };
+    rd.readAsArrayBuffer(f);
+  });
+}
+function removePlan(i){ PLANS.splice(i,1); render(); }
+
+/* ---- 送った記録の読み取り ---- */
+function records(){
+  var today = new Date(); today.setHours(0,0,0,0);
+  var from = new Date(today); from.setDate(from.getDate() - 7*WEEKS + 1);
+  var recs = [];
+  try{
+    for(var i=0;i<localStorage.length;i++){
+      var k = localStorage.key(i);
+      var m = k && k.match(/^base_(\d{4})-(\d{2})-(\d{2})$/);
+      if(!m) continue;
+      var d = new Date(+m[1], +m[2]-1, +m[3]);
+      if(d < from) continue;
+      var b; try{ b = JSON.parse(localStorage.getItem(k)||"{}"); }catch(e){ continue; }
+      var by = {}, names = {};
+      Object.keys(b||{}).forEach(function(n){
+        if(b[n] instanceof Array){ by[norm(n)] = b[n]; names[norm(n)] = n; }
+      });
+      if(!Object.keys(by).length) continue;
+      recs.push({d:d, w:d.getDay(), by:by, names:names, label:(d.getMonth()+1)+"/"+d.getDate()});
+    }
+  }catch(e){}
+  recs.sort(function(a,b){ return a.d-b.d; });
+  return recs;
+}
+function staffOrder(){
+  try{ return (JSON.parse(localStorage.getItem("staffnames")||"[]")||[]).map(norm); }catch(e){ return []; }
+}
+
+/* ---- 照合 ---- */
+function compare(P, recs){
+  var res = {days:[], tmp:[], cand:0, seen:0};
+  ORDER.forEach(function(w){
+    var plan = P.items.filter(function(x){ return x.w===w; })
+                      .sort(function(a,b){ return toMin(a.st)-toMin(b.st); });
+    var dates = recs.filter(function(r){ return r.w===w && r.by[P.key]; });
+    var W = dates.length;
+    res.seen += W;
+    var st = plan.map(function(p){ return {p:p, ok:0, chg:{}, chgN:0, miss:0, who:{}}; });
+    var extra = {};
+    dates.forEach(function(r){
+      var A = r.by[P.key].slice(), used = plan.map(function(){ return false; });
+      plan.forEach(function(p,pi){
+        for(var a=0;a<A.length;a++){
+          if(same(A[a],p) && tkey(A[a])===tkey(p)){ st[pi].ok++; used[pi]=true; A.splice(a,1); return; }
+        }
+      });
+      while(true){
+        var best = null;
+        plan.forEach(function(p,pi){
+          if(used[pi]) return;
+          A.forEach(function(a,ai){
+            if(!same(a,p)) return;
+            var dd = Math.abs(toMin(a.st)-toMin(p.st));
+            if(!best || dd < best.dd) best = {pi:pi, ai:ai, dd:dd};
+          });
+        });
+        if(!best) break;
+        var got = A[best.ai];
+        st[best.pi].chg[tlab(got)] = (st[best.pi].chg[tlab(got)]||0)+1;
+        st[best.pi].chgN++;
+        used[best.pi] = true; A.splice(best.ai,1);
+      }
+      plan.forEach(function(p,pi){
+        if(used[pi]) return;
+        st[pi].miss++;
+        var hit = null;
+        Object.keys(r.by).forEach(function(k){
+          if(k===P.key) return;
+          r.by[k].forEach(function(a){
+            if(!same(a,p)) return;
+            var dd = Math.abs(toMin(a.st)-toMin(p.st));
+            if(!hit || dd < hit.dd) hit = {dd:dd, n:r.names[k]};
+          });
+        });
+        if(hit) st[pi].who[hit.n] = (st[pi].who[hit.n]||0)+1;
+      });
+      A.forEach(function(a){
+        var key = norm(a.u)+"|"+tkey(a);
+        if(!extra[key]) extra[key] = {v:a, n:0, when:[]};
+        extra[key].n++; extra[key].when.push(r.label);
+      });
+    });
+
+    var need = Math.max(2, Math.ceil(W/2));
+    var items = [];
+    st.forEach(function(x){
+      var off = W - x.ok;
+      if(!W || off===0) return;
+      if(off >= need){
+        if(x.chgN >= x.miss){
+          var arr = Object.keys(x.chg).sort(function(a,b){ return x.chg[b]-x.chg[a]; });
+          items.push({kind:"t", u:x.p.u, sort:toMin(x.p.st),
+            text:tlab(x.p)+" → <b>"+arr.map(function(t){ return t+(arr.length>1?"（"+x.chg[t]+"回）":""); }).join("、")+"</b>",
+            n:W+"回中"+off+"回", note: x.miss ? "ほかに行っていない日が"+x.miss+"回" : ""});
+        }else{
+          var whos = Object.keys(x.who).sort(function(a,b){ return x.who[b]-x.who[a]; });
+          items.push({kind:"m", u:x.p.u, sort:toMin(x.p.st),
+            text:tlab(x.p)+" "+esc(x.p.s)+" → <b>行っていない</b>",
+            n:W+"回中"+x.miss+"回",
+            note: whos.length ? "実際は "+whos.map(function(n){ return esc(n)+"さん（"+x.who[n]+"回）"; }).join("、")+"が担当" : ""});
+        }
+      }else{
+        res.tmp.push(DOWJ[w]+" "+x.p.u+" 様 "+tlab(x.p)+"：違う日 "+off+"回（"+W+"回中）");
+      }
+    });
+    Object.keys(extra).forEach(function(k){
+      var e = extra[k];
+      if(e.n >= need){
+        var other = PLANS.filter(function(q){
+          return q.key!==P.key && q.items.some(function(x){ return x.w===w && same(x,e.v) && tkey(x)===tkey(e.v); });
+        }).map(function(q){ return q.name; });
+        items.push({kind:"a", u:e.v.u, sort:toMin(e.v.st),
+          text:"<b>"+tlab(e.v)+" "+esc(e.v.s)+"</b> を追加",
+          n:W+"回中"+e.n+"回",
+          note: other.length ? esc(other.join("、"))+"さんの週間プランに入っています（担当を移す）" : ""});
+      }else{
+        res.tmp.push(DOWJ[w]+" "+e.v.u+" 様 "+tlab(e.v)+"：週間プランにない（"+e.when.join("、")+"）");
+      }
+    });
+    items.sort(function(a,b){ return a.sort-b.sort; });
+    res.cand += items.length;
+    if(items.length || (!W && plan.length)) res.days.push({w:w, W:W, items:items, planN:plan.length});
+  });
+  return res;
+}
+
+/* ---- 表示 ---- */
+var IDS = [];
+function toggleDone(i){ var id = IDS[i]; DONE[id] = !DONE[id]; render(); }
+function setWeeks(v){ WEEKS = +v; render(); }
+
+function render(){
+  var out = document.getElementById("out");
+  var recs = records();
+  var html = "";
+  IDS = [];
+  ERRS.forEach(function(e){ html += '<div class="err">'+esc(e)+'</div>'; });
+
+  var span = recs.length ? recs[0].label+"〜"+recs[recs.length-1].label+" のうち "+recs.length+"日分" : "記録がありません";
+  html += '<div class="bar">比べる期間 <select onchange="setWeeks(this.value)">'+
+    [4,6,8].map(function(n){ return '<option value="'+n+'"'+(n===WEEKS?' selected':'')+'>直近'+n+'週間</option>'; }).join("")+
+    '</select><span>送った記録：'+esc(span)+'</span>'+
+    (PLANS.length ? '<button class="noprint" onclick="window.print()" style="margin-left:auto">印刷</button>' : '')+'</div>';
+
+  if(!recs.length){
+    html += '<div class="err">この端末には、スケジュール作成ツールで送った記録がありません。いつもLINEの送信に使っている端末とブラウザで開いてください。</div>';
+  }
+  if(PLANS.length){
+    html += '<div class="chips">'+PLANS.map(function(p,i){
+      return '<span class="chip">'+esc(p.name)+'<button title="外す" onclick="removePlan('+i+')">×</button></span>';
+    }).join("")+'</div>';
+  }
+
+  var ord = staffOrder();
+  var plans = PLANS.slice().sort(function(a,b){
+    var x = ord.indexOf(a.key), y = ord.indexOf(b.key);
+    if(x<0) x = 999; if(y<0) y = 999;
+    return x-y;
+  });
+  plans.forEach(function(P){
+    var r = compare(P, recs);
+    var tag, sub = "";
+    if(!r.seen){
+      tag = '<span class="tag no">記録なし</span>';
+      sub = "この期間に、このスタッフへ送った記録がありません（送信対象から外している、別の端末で送っている、名前の書き方が違う、など）。";
+    }else if(r.cand){
+      tag = '<span class="tag chg">直す候補 '+r.cand+'件</span>';
+    }else{
+      tag = '<span class="tag ok">週間プランどおり</span>';
+    }
+    html += '<div class="card'+(r.cand?' has':'')+'"><div class="chead"><span class="nm">'+esc(P.name)+'</span>'+tag+'</div>';
+    if(sub) html += '<div class="sub">'+esc(sub)+'</div>';
+    if(r.seen){
+      r.days.forEach(function(d){
+        html += '<div class="day"><div class="dlab">'+DOWJ[d.w]+'曜'+(d.W?'（記録 '+d.W+'回）':'')+'</div>';
+        if(!d.W){
+          html += '<div class="dnote">この曜日は記録がありません（週間プランには '+d.planN+'件）。お休みの曜日になっていないか確かめてください。</div>';
+        }else if(d.W < 2){
+          html += '<div class="dnote">記録が1回だけなので、まだ判断できません。</div>';
+        }
+        d.items.forEach(function(it){
+          var id = P.key+"|"+d.w+"|"+it.kind+"|"+it.u+"|"+it.sort+"|"+it.text;
+          var lab = {t:"時刻",a:"追加",m:"なし"}[it.kind];
+          IDS.push(id);
+          html += '<label class="item'+(DONE[id]?' done':'')+'"><input type="checkbox"'+(DONE[id]?' checked':'')+
+            ' onchange="toggleDone('+(IDS.length-1)+')"><span class="tx">'+
+            '<span class="k '+it.kind+'">'+lab+'</span><span class="who">'+sama(it.u)+'</span> '+it.text+
+            ' <span class="n">'+esc(it.n)+'</span>'+
+            (it.note ? '<span class="note">'+it.note+'</span>' : '')+'</span></label>';
+        });
+        html += '</div>';
+      });
+      if(r.tmp.length){
+        html += '<details class="tmp"><summary>1回だけの変更など（直さなくてよいもの） '+r.tmp.length+'件</summary><ul>'+
+          r.tmp.map(function(t){ return '<li>'+esc(t)+'</li>'; }).join("")+'</ul></details>';
+      }
+    }
+    html += '</div>';
+  });
+  out.innerHTML = html;
+}
+
+var drop = document.getElementById("drop");
+document.getElementById("file").addEventListener("change", function(e){ addFiles(e.target.files); e.target.value=""; });
+["dragenter","dragover"].forEach(function(ev){ drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.add("over"); }); });
+["dragleave","drop"].forEach(function(ev){ drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.remove("over"); }); });
+drop.addEventListener("drop", function(e){ addFiles(e.dataTransfer.files); });
+render();
+</script>
+</body>
+</html>
