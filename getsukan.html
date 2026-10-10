@@ -187,10 +187,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,label:focus-within
       <input type="file" id="file" accept=".xlsx,.xls" multiple>
     </label>
   </div>
+  <div id="saveerr"></div>
   <div id="msgs"></div>
   <div id="out"></div>
   <p class="foot">
-    ファイルはこの端末の中だけで処理され、どこにも送信されません。直した内容はこの端末のブラウザに保存され、閉じても続きから作業できます。<br>
+    ファイルはこの端末の中だけで処理され、どこにも送信されません。直した内容はこの端末のブラウザに保存され、閉じても続きから作業できます（作業中の月を含めて3か月分まで残り、それより前の月は自動で消えます）。<br>
     「担会（　）」の枠は予定として扱いません。
   </p>
 </div>
@@ -233,9 +234,35 @@ function toast(msg){ var t=document.getElementById("toast"); t.textContent=msg; 
 
 /* ---- 保存 ---- */
 function key(){ return "getsu_"+S.y+"-"+pad(S.m); }
+var KEEP_MONTHS = 3;   // 端末に残す月数（作業中の月を含めて、それより前の月は自動で消す）
+var SAVE_ERR = false;
+function monthIndex(k){ var m = /^getsu_(\d{4})-(\d{2})$/.exec(k); return m ? (+m[1])*12 + (+m[2]) - 1 : null; }
+function pruneOld(){
+  // 作業中の月から数えて KEEP_MONTHS か月より前のものを消す（先の月は残す）
+  var cur = S.y*12 + S.m - 1, del = [];
+  try{
+    for(var i=0;i<localStorage.length;i++){
+      var k = localStorage.key(i), mi = monthIndex(k);
+      if(mi!==null && mi <= cur-KEEP_MONTHS) del.push(k);
+    }
+    del.forEach(function(k){ localStorage.removeItem(k); });
+  }catch(e){}
+  return del.length;
+}
 function save(){
   if(!S) return;
-  try{ localStorage.setItem(key(), JSON.stringify(S)); localStorage.setItem("getsu_last", key()); }catch(e){}
+  var data = JSON.stringify(S), ok = false;
+  var put = function(){ localStorage.setItem(key(), data); localStorage.setItem("getsu_last", key()); };
+  try{ pruneOld(); put(); ok = true; }catch(e){}
+  var was = SAVE_ERR;
+  SAVE_ERR = !ok;
+  if(was !== SAVE_ERR) showSaveErr();
+}
+function showSaveErr(){
+  var el = document.getElementById("saveerr");
+  if(!el) return;
+  el.innerHTML = SAVE_ERR ? '<div class="err"><b>この端末に保存できませんでした。</b>ブラウザの保存の空きが足りないか、保存が止められています。'+
+    'このページを閉じたり読み込み直したりすると、直した内容が消えます。先に印刷・LINEの文面・介舟で直す一覧を済ませてください。</div>' : '';
 }
 function restore(){
   try{
@@ -375,8 +402,20 @@ function merge(got){
 }
 
 /* ---- 差分 ---- */
-function origOf(id){ for(var i=0;i<S.orig.length;i++) if(S.orig[i].id===id) return S.orig[i]; return null; }
-function itemOf(id){ for(var i=0;i<S.items.length;i++) if(S.items[i].id===id) return S.items[i]; return null; }
+// id から予定を引く索引。予定の配列が入れ替わるか件数が変わったときだけ作り直す
+// （予定の中身を直すときは同じオブジェクトを書き換えるので、索引はそのまま使える）
+var IX = null;
+function ix(){
+  if(!IX || IX.ia!==S.items || IX.il!==S.items.length || IX.oa!==S.orig || IX.ol!==S.orig.length){
+    var it = {}, og = {};
+    S.items.forEach(function(v){ it[v.id] = v; });
+    S.orig.forEach(function(v){ og[v.id] = v; });
+    IX = {ia:S.items, il:S.items.length, oa:S.orig, ol:S.orig.length, it:it, og:og};
+  }
+  return IX;
+}
+function origOf(id){ return ix().og[id] || null; }
+function itemOf(id){ return ix().it[id] || null; }
 function stateOf(v){
   var o = origOf(v.id);
   if(!o) return "add";
@@ -395,7 +434,15 @@ function changes(){
   return list;
 }
 function hasChanges(k){ return changes().some(function(x){ return x.k===k || (x.c && x.c.k===k); }); }
-function changeCount(k){ return changes().filter(function(x){ return x.k===k || (x.kind==="mv" && x.c.k===k); }).length; }
+// 担当者ごとの直した件数（タブの数字）。直した一覧は1回だけ作って数える
+function changeCounts(list){
+  var n = {};
+  list.forEach(function(x){
+    n[x.k] = (n[x.k]||0) + 1;
+    if(x.kind==="mv" && x.c.k!==x.k) n[x.c.k] = (n[x.c.k]||0) + 1;
+  });
+  return n;
+}
 
 /* ---- 画面 ---- */
 function setCurI(i){ setCur(S.staff[i].k); }
@@ -427,7 +474,7 @@ function render(){
   var out = document.getElementById("out");
   if(!S || !S.staff.length){ out.innerHTML = ""; return; }
   if(!S.staff.some(function(x){ return x.k===CUR; })) CUR = S.staff[0].k;
-  var nChg = changes().length;
+  var chList = changes(), nChg = chList.length, counts = changeCounts(chList);
   var h = '<div class="top"><span class="month">令和'+(S.y-2018)+'年'+S.m+'月</span>'+
     '<button class="btn'+(VIEW==="cal"?' main':'')+'" onclick="setView(\'cal\')">予定を直す</button>'+
     '<button class="btn'+(VIEW==="list"?' main':'')+'" onclick="setView(\'list\')">介舟で直す一覧'+(nChg?'（'+nChg+'）':'')+'</button>'+
@@ -437,9 +484,9 @@ function render(){
     '<button class="btn" onclick="setView(\'line\')">LINEの文面</button>'+
     '<button class="btn danger" onclick="clearAll()">消す</button></div>';
   if(VIEW!=="list"){
-    h += '<div class="tabs">'+S.staff.map(function(x){
-      var n = changeCount(x.k);
-      return '<button class="tab'+(x.k===CUR?' on':'')+'" onclick="setCurI('+S.staff.indexOf(x)+')">'+esc(x.n)+(x.manual?'<u>手動</u>':'')+(n?'<i>'+n+'</i>':'')+'</button>';
+    h += '<div class="tabs">'+S.staff.map(function(x, i){
+      var n = counts[x.k]||0;
+      return '<button class="tab'+(x.k===CUR?' on':'')+'" onclick="setCurI('+i+')">'+esc(x.n)+(x.manual?'<u>手動</u>':'')+(n?'<i>'+n+'</i>':'')+'</button>';
     }).join("")+'<button class="tab new" onclick="openAddStaff()">＋ 担当者を足す</button></div>';
     var cs = staffOf(CUR);
     if(cs && cs.manual){
@@ -448,7 +495,7 @@ function render(){
     }
   }
   if(VIEW==="cal") h += calHTML(CUR);
-  else if(VIEW==="list") h += listHTML();
+  else if(VIEW==="list") h += listHTML(chList);
   else h += lineHTML(CUR);
   out.innerHTML = h;
 }
@@ -575,6 +622,20 @@ function readForm(){
 }
 function saveEdit(){
   var f = readForm(); if(!f) return;
+  // 毎週まとめて直すとき、日付をずらすと月の外にはみ出す週は直さずに残す（先に確かめる）
+  var v = null, later = [], skip = [];
+  if(!EDIT.isNew){
+    v = itemOf(EDIT.id);
+    var all = document.getElementById("f_all");
+    later = (all && all.checked) ? sameLater(v) : [];
+    var dd = f.d - v.d;
+    if(dd){
+      skip = later.filter(function(x){ var nd = x.d+dd; return nd<1 || nd>days(); });
+      later = later.filter(function(x){ return skip.indexOf(x)<0; });
+    }
+    if(skip.length && !confirm(skip.map(function(x){ return x.d+"日"; }).join("・")+" の予定は、"+Math.abs(dd)+"日"+(dd>0?"後":"前")+"にずらすと"+S.m+"月の外になるため動かせません。\n"+
+      "この日の予定は直さずにそのまま残し、ほかの日だけ直します。よろしいですか？\n（残した日は、あとで1件ずつ直してください）")) return;
+  }
   if(f.newName){
     var had = !!staffOf(norm(f.newName));
     f.k = ensureStaff(f.newName);
@@ -584,12 +645,11 @@ function saveEdit(){
     S.items.push({id:S.seq++, k:f.k, ok:"", d:f.d, st:f.st, en:f.en, u:f.u, s:f.s});
     if(f.k!==CUR) CUR = f.k;
   }else{
-    var v = itemOf(EDIT.id);
-    var all = document.getElementById("f_all"), later = (all && all.checked) ? sameLater(v) : [];
-    var dd = f.d - v.d;
-    later.forEach(function(x){ x.st=f.st; x.en=f.en; x.u=f.u; x.s=f.s; x.k=f.k; if(dd){ var nd=x.d+dd; if(nd>=1 && nd<=days()) x.d=nd; } });
+    var shift = f.d - v.d;
+    later.forEach(function(x){ x.st=f.st; x.en=f.en; x.u=f.u; x.s=f.s; x.k=f.k; x.d += shift; });
     v.d=f.d; v.st=f.st; v.en=f.en; v.u=f.u; v.s=f.s; v.k=f.k;
-    if(later.length) toast((later.length+1)+"件をまとめて直しました");
+    if(skip.length) toast((later.length+1)+"件を直しました（"+skip.map(function(x){ return x.d+"日"; }).join("・")+" はそのまま）");
+    else if(later.length) toast((later.length+1)+"件をまとめて直しました");
   }
   save(); closeDlg(); render();
 }
@@ -640,6 +700,8 @@ function removeStaff(){
 
 document.addEventListener("keydown", function(e){
   if(!EDIT) return;
+  // 日本語入力で変換を確定するEnterは保存に使わない
+  if(e.isComposing || e.keyCode===229) return;
   if(e.key==="Escape") closeDlg();
   if(e.key==="Enter" && e.target.tagName==="INPUT"){ if(EDIT.staff) saveStaff(); else saveEdit(); }
 });
@@ -649,9 +711,9 @@ var GIDS = [];
 function toggleDoneI(i){ toggleDone(GIDS[i]); }
 function toggleDone(sg){ S.done[sg] = !S.done[sg]; save(); render(); }
 // 直したところを「同じ直し（毎週続くもの）」ごとにまとめ、スタッフ順に並べる。画面と印刷で同じものを使う
-function changeGroups(){
+function changeGroups(list){
   var groups = {};
-  changes().forEach(function(x){
+  (list || changes()).forEach(function(x){
     var ref = x.o || x.c, w = dow(ref.d), g;
     if(x.kind==="add") g = ["add", x.k, w, x.c.st, x.c.en, norm(x.c.u), x.c.s].join("|");
     else if(x.kind==="del") g = ["del", x.k, w, x.o.st, x.o.en, norm(x.o.u)].join("|");
@@ -687,9 +749,9 @@ function changeGroups(){
   });
   return out;
 }
-function listHTML(){
+function listHTML(list){
   GIDS = [];
-  var all = changeGroups();
+  var all = changeGroups(list);
   var h = '<div class="panel"><div class="ph2"><h3>介舟で直す一覧</h3>'+(all.length?'<button class="btn" onclick="printList()">この一覧を印刷</button>':'')+'</div>'+
     '<div class="sub">ヘルパーさんに渡す表を作り終えたら、この一覧を見ながら介舟の予定を直してください。終わったものにチェックを付けると消し込めます。<br>'+
     '同じ直しが<b>毎週</b>続いているものには「毎週」の印が付きます。介舟の<b>週間計画</b>も直しておくと、来月は直さずに済みます。</div>';
