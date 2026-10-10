@@ -46,6 +46,13 @@ input[type=file]{position:absolute;width:1px;height:1px;opacity:0}
 .tab.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
 .tab i{font-style:normal;font-size:11.5px;margin-left:5px;padding:1px 6px;border-radius:99px;background:var(--warn-bg);color:var(--warn);font-weight:700}
 .tab.on i{background:rgba(255,255,255,.25);color:#fff}
+.tab.new{border-style:dashed;border-color:#B7C4CC;color:var(--accent);background:none}
+.tab u{text-decoration:none;font-size:11px;margin-left:5px;opacity:.75}
+.manual{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0 0;padding:9px 12px;background:#FFFBEA;border:1px solid #EBD98C;border-radius:10px;font-size:13.5px;line-height:1.6;color:#5C4A08}
+.manual .btn{margin-left:auto}
+.newst{display:none}
+.newst.on{display:flex}
+.hint{font-size:12.5px;color:var(--muted);margin:-4px 0 10px;line-height:1.6}
 .btn{padding:8px 13px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--accent);font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer}
 .btn.main{background:var(--accent);border-color:var(--accent);color:#fff}
 .btn.quiet{color:var(--muted);font-weight:400}
@@ -198,6 +205,8 @@ function sig(v){ return v.st+"-"+v.en+"|"+norm(v.u)+"|"+v.s; }
 function dow(d){ return new Date(S.y, S.m-1, d).getDay(); }
 function days(){ return new Date(S.y, S.m, 0).getDate(); }
 function staffName(k){ for(var i=0;i<S.staff.length;i++) if(S.staff[i].k===k) return S.staff[i].n; return k; }
+function staffOf(k){ for(var i=0;i<S.staff.length;i++) if(S.staff[i].k===k) return S.staff[i]; return null; }
+function cleanName(s){ return clean(s).replace(/\s*(様|さん)$/,""); }
 function label(v){ return v.st+"-"+v.en+" "+v.u+(v.s?"("+v.s+")":""); }
 function toast(msg){ var t=document.getElementById("toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(t._h); t._h=setTimeout(function(){ t.classList.remove("on"); },2200); }
 
@@ -317,8 +326,11 @@ function merge(got){
     if(r.tel) S.tel = r.tel; if(r.org) S.org = r.org;
     r.staff.forEach(function(st){
       var k = norm(st.n);
-      var exists = S.staff.some(function(x){ return x.k===k; });
-      if(exists){
+      var exists = S.staff.filter(function(x){ return x.k===k; })[0];
+      if(exists && exists.manual){
+        // 手で足した人の介舟ファイルを後から読み込んだとき：画面で足した予定はそのまま残し、介舟の予定を加える
+        exists.manual = false; exists.n = st.n;
+      }else if(exists){
         var touched = S.items.some(function(v){ return v.k===k || v.ok===k; }) && hasChanges(k);
         if(touched && !confirm(st.n+" さんは読み込み済みで、直した内容があります。読み込み直すと、この人の直した内容は消えます。読み込み直しますか？")) return;
         S.items = S.items.filter(function(v){ return v.ok!==k; });
@@ -406,8 +418,13 @@ function render(){
   if(VIEW!=="list"){
     h += '<div class="tabs">'+S.staff.map(function(x){
       var n = changeCount(x.k);
-      return '<button class="tab'+(x.k===CUR?' on':'')+'" onclick="setCurI('+S.staff.indexOf(x)+')">'+esc(x.n)+(n?'<i>'+n+'</i>':'')+'</button>';
-    }).join("")+'</div>';
+      return '<button class="tab'+(x.k===CUR?' on':'')+'" onclick="setCurI('+S.staff.indexOf(x)+')">'+esc(x.n)+(x.manual?'<u>手動</u>':'')+(n?'<i>'+n+'</i>':'')+'</button>';
+    }).join("")+'<button class="tab new" onclick="openAddStaff()">＋ 担当者を足す</button></div>';
+    var cs = staffOf(CUR);
+    if(cs && cs.manual){
+      h += '<div class="manual"><span>'+esc(cs.n)+' さんは手で足した担当者です（介舟のファイルは読み込んでいません）。この人の予定はすべて「介舟で直す一覧」に載ります。</span>'+
+        '<button class="btn danger" onclick="removeStaff()">この人を一覧から外す</button></div>';
+    }
   }
   if(VIEW==="cal") h += calHTML(CUR);
   else if(VIEW==="list") h += listHTML();
@@ -452,7 +469,21 @@ function calHTML(k){
 
 /* ---- 編集 ---- */
 function staffOptions(sel){
-  return S.staff.map(function(x){ return '<option value="'+esc(x.k)+'"'+(x.k===sel?' selected':'')+'>'+esc(x.n)+'</option>'; }).join("");
+  return S.staff.map(function(x){ return '<option value="'+esc(x.k)+'"'+(x.k===sel?' selected':'')+'>'+esc(x.n)+'</option>'; }).join("")+
+    '<option value="__new__">＋ 一覧にない人を追加…</option>';
+}
+function onStaffSel(){
+  var on = document.getElementById("f_k").value==="__new__";
+  document.getElementById("f_newrow").classList.toggle("on", on);
+  document.getElementById("f_newhint").classList.toggle("on", on);
+  if(on) document.getElementById("f_newk").focus();
+}
+// 名前から担当者を探し、いなければ手動の担当者として足す。足した（見つけた）人の key を返す
+function ensureStaff(name){
+  var n = cleanName(name), k = norm(n);
+  if(!k) return "";
+  if(!staffOf(k)) S.staff.push({k:k, n:n, manual:true});
+  return k;
 }
 function dayOptions(sel){
   var h = "";
@@ -483,7 +514,9 @@ function dlgHTML(v, isNew){
     '<div class="fr"><label>時刻</label><input class="tm" id="f_st" value="'+esc(v.st)+'" placeholder="08:30" inputmode="numeric"><span>〜</span><input class="tm" id="f_en" value="'+esc(v.en)+'" placeholder="09:00" inputmode="numeric"></div>'+
     '<div class="fr"><label>利用者</label><input id="f_u" list="ulist" value="'+esc(v.u)+'"></div>'+
     '<div class="fr"><label>サービス</label><input id="f_s" list="slist" value="'+esc(v.s)+'" placeholder="介身・介通・障移身 など"></div>'+
-    '<div class="fr"><label>担当</label><select id="f_k">'+staffOptions(v.k)+'</select></div>'+
+    '<div class="fr"><label>担当</label><select id="f_k" onchange="onStaffSel()">'+staffOptions(v.k)+'</select></div>'+
+    '<div class="fr newst" id="f_newrow"><label>名前</label><input id="f_newk" placeholder="例：山田 花子"></div>'+
+    '<div class="hint newst" id="f_newhint">介舟のファイルを読み込んでいない人も担当にできます。足した人はタブにも並び、印刷・LINEの文面も作れます。</div>'+
     '<datalist id="ulist">'+userList().map(function(u){ return '<option value="'+esc(u)+'">'; }).join("")+'</datalist>'+
     '<datalist id="slist">'+svcList().map(function(s){ return '<option value="'+esc(s)+'">'; }).join("")+'</datalist>'+
     (later.length ? '<label class="bulk"><input type="checkbox" id="f_all"><span>この日より後の<b>毎週'+DOWJ[dow(v.d)]+'曜</b>の同じ予定（'+later.map(function(x){ return x.d+'日'; }).join('・')+'）も同じように直す</span></label>' : '')+
@@ -512,10 +545,20 @@ function readForm(){
   if(!st || !en){ alert("時刻は「8:30」や「0830」のように入れてください。"); return null; }
   if(toMin(en) <= toMin(st)){ alert("終わりの時刻が始まりより前になっています。"); return null; }
   if(!u){ alert("利用者名を入れてください。"); return null; }
-  return {d:+document.getElementById("f_d").value, st:st, en:en, u:u, s:s, k:document.getElementById("f_k").value};
+  var k = document.getElementById("f_k").value, nn = "";
+  if(k==="__new__"){
+    nn = cleanName(document.getElementById("f_newk").value);
+    if(!norm(nn)){ alert("担当者の名前を入れてください。"); document.getElementById("f_newk").focus(); return null; }
+  }
+  return {d:+document.getElementById("f_d").value, st:st, en:en, u:u, s:s, k:k, newName:nn};
 }
 function saveEdit(){
   var f = readForm(); if(!f) return;
+  if(f.newName){
+    var had = !!staffOf(norm(f.newName));
+    f.k = ensureStaff(f.newName);
+    if(had) toast(staffName(f.k)+" さんはすでに一覧にいたので、その人に入れました");
+  }
   if(EDIT.isNew){
     S.items.push({id:S.seq++, k:f.k, ok:"", d:f.d, st:f.st, en:f.en, u:f.u, s:f.s});
     if(f.k!==CUR) CUR = f.k;
@@ -544,10 +587,40 @@ function restoreItem(id){
   S.items.push(JSON.parse(JSON.stringify(o)));
   save(); render();
 }
+/* ---- 担当者を手で足す・外す ---- */
+function openAddStaff(){
+  EDIT = {staff:true};
+  document.getElementById("dlg").innerHTML = '<h3>担当者を足す</h3>'+
+    '<div class="hint" style="margin:0 0 10px">介舟のファイルがない人（新しく入った人・応援の人など）を一覧に足します。足したあと、その人の予定を「＋」で入れたり、ほかの人の予定を移したりできます。</div>'+
+    '<div class="fr"><label>名前</label><input id="f_name" placeholder="例：山田 花子"></div>'+
+    '<div class="dbtns"><button class="btn main" onclick="saveStaff()">足す</button><button class="btn quiet" onclick="closeDlg()">やめる</button></div>';
+  document.getElementById("mask").classList.add("on");
+  setTimeout(function(){ var e=document.getElementById("f_name"); if(e) e.focus(); }, 50);
+}
+function saveStaff(){
+  var n = cleanName(document.getElementById("f_name").value);
+  if(!norm(n)){ alert("名前を入れてください。"); return; }
+  var had = !!staffOf(norm(n));
+  CUR = ensureStaff(n);
+  if(VIEW!=="cal") VIEW = "cal";
+  save(); closeDlg(); render();
+  toast(had ? staffName(CUR)+" さんはすでに一覧にいます" : staffName(CUR)+" さんを足しました");
+}
+function removeStaff(){
+  var x = staffOf(CUR); if(!x || !x.manual) return;
+  var mine = S.items.filter(function(v){ return v.k===x.k; });
+  if(!confirm(x.n+" さんを一覧から外しますか？"+(mine.length ? "\nこの人に入れた予定 "+mine.length+" 件は、足した予定は消し、ほかの人から移した予定は介舟の予定に戻します。" : ""))) return;
+  S.items = S.items.filter(function(v){ return v.k!==x.k; });
+  mine.forEach(function(v){ var o = origOf(v.id); if(o) S.items.push(JSON.parse(JSON.stringify(o))); });
+  S.staff = S.staff.filter(function(s){ return s.k!==x.k; });
+  CUR = (S.staff[0]||{}).k||"";
+  save(); render(); toast(x.n+" さんを外しました");
+}
+
 document.addEventListener("keydown", function(e){
   if(!EDIT) return;
   if(e.key==="Escape") closeDlg();
-  if(e.key==="Enter" && e.target.tagName==="INPUT") saveEdit();
+  if(e.key==="Enter" && e.target.tagName==="INPUT"){ if(EDIT.staff) saveStaff(); else saveEdit(); }
 });
 
 /* ---- 介舟で直す一覧 ---- */
