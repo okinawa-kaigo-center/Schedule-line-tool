@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>データの引っ越し｜スケジュール作成＆LINE送信</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#E9EDEE;--card:#fff;--ink:#16262B;--muted:#67797F;--line:#DDE4E6;--accent:#0E5A61;--warn:#8A5300;--warn-bg:#FBEBD2}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"BIZ UDPGothic","Hiragino Sans","Yu Gothic",Meiryo,sans-serif;font-size:16px;line-height:1.7}
+header{background:var(--accent);color:#fff;padding:14px 16px;font-weight:700;font-size:17px}
+.wrap{max-width:640px;margin:0 auto;padding:12px 16px 40px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:12px}
+h2{font-size:16px;margin:0 0 6px}
+ol{margin:6px 0 0;padding-left:1.4em}
+li{margin:4px 0}
+.btn{display:block;width:100%;min-height:48px;margin-top:10px;border:none;border-radius:10px;background:var(--accent);color:#fff;font:inherit;font-weight:700;cursor:pointer}
+.btn:disabled{opacity:.5;cursor:default}
+.warn{background:var(--warn-bg);border-radius:10px;padding:10px 12px;font-size:14px;margin-top:10px}
+.warn b{color:var(--warn)}
+.sum{font-size:14.5px;color:var(--muted)}
+.sum b{color:var(--ink)}
+a{color:var(--accent);font-weight:700}
+</style>
+</head>
+<body>
+<header>データの引っ越し（スケジュール作成＆LINE送信）</header>
+<div class="wrap">
+  <div class="card">
+    <h2>このページですること</h2>
+    スケジュール作成＆LINE送信は、事業所のツール集（Firebase）に引っ越します。<br>
+    アドレスが変わるとブラウザの保存場所も変わるため、この端末に保存している内容（定型文・配車・送信しない人の設定・送信の記録・作業中の月間スケジュール）は、そのままでは新しいアドレスに出てきません。
+    このページで<b>ファイルに書き出し</b>、新しいアドレスで<b>読み込む</b>と、続きから使えます。
+  </div>
+
+  <div class="card">
+    <h2>この端末に保存している内容</h2>
+    <div class="sum" id="sum">調べています…</div>
+    <button class="btn" id="out" disabled>ファイルに書き出す</button>
+    <div class="warn"><b>⚠ 書き出したファイルには、利用者さんとヘルパーさんの名前・予定が入ります。</b>事務所のパソコンに保存し、メールやLINEで送らないでください。新しいアドレスで読み込んだら、ファイルは消してください。</div>
+  </div>
+
+  <div class="card">
+    <h2>新しいアドレスでの読み込み方</h2>
+    <ol>
+      <li>ツール集の「スケジュール作成＆LINE送信」を開く（<a href="https://okc-houmon-tools.web.app/schedule/">https://okc-houmon-tools.web.app/schedule/</a>）</li>
+      <li>いちばん上の帯の右にある「控え・消去」を押す</li>
+      <li>「控えから元に戻す」を押し、ここで書き出したファイルを選ぶ</li>
+    </ol>
+    <p class="sum">パソコンごと・ブラウザごとに保存場所が別なので、使っている端末それぞれで書き出しと読み込みをしてください。</p>
+  </div>
+</div>
+
+<script>
+// 古いアドレスの保存場所の名前 → ツール集での名前（頭に kaigo-tools-schedule: を付ける）
+var P = "kaigo-tools-schedule:";
+var DAILY = /^(base|memo|man|note|pair|edit)_/;
+var FIXED = ["tpl","skip","cars","carlist","staffnames"];
+var MONTH = /^getsu_/;
+function collect(){
+  var data = {}, n = {days:{}, months:0, fixed:0};
+  for(var i=0;i<localStorage.length;i++){
+    var k = localStorage.key(i);
+    if(!k) continue;
+    var own = DAILY.test(k) || FIXED.indexOf(k)>=0 || MONTH.test(k);
+    if(!own) continue;
+    data[P+k] = localStorage.getItem(k);
+    if(DAILY.test(k)) n.days[k.replace(DAILY,"")] = 1;
+    else if(/^getsu_\d{4}-\d{2}$/.test(k)) n.months++;
+    else if(FIXED.indexOf(k)>=0) n.fixed++;
+  }
+  return {data:data, n:n};
+}
+function pad(x){ return (x<10?"0":"")+x; }
+var c;
+try{ c = collect(); }catch(e){ c = null; }
+var sum = document.getElementById("sum"), btn = document.getElementById("out");
+if(!c){
+  sum.textContent = "このブラウザでは保存場所を読めませんでした。";
+}else if(!Object.keys(c.data).length){
+  sum.innerHTML = "この端末には、引っ越す内容はありません。新しいアドレスをそのまま使ってください。";
+}else{
+  var days = Object.keys(c.n.days).length;
+  sum.innerHTML = "送信の記録：<b>"+days+"日分</b>　作業中の月間スケジュール：<b>"+c.n.months+"か月分</b>　設定（定型文・配車など）："+(c.n.fixed?"<b>あり</b>":"なし");
+  btn.disabled = false;
+}
+btn.addEventListener("click", function(){
+  var d = new Date();
+  var file = {kind:"kaigo-tools-hikae", version:1, tool:"schedule", name:"スケジュール作成＆LINE送信",
+              source:"browser", exportedAt:d.toISOString(), from:location.origin, data:collect().data};
+  var blob = new Blob([JSON.stringify(file, null, 1)], {type:"application/json"});
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "控え_スケジュール作成＆LINE送信_引っ越し_"+d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(a.href); }, 10000);
+});
+</script>
+</body>
+</html>
