@@ -90,6 +90,8 @@ input[type=file]{position:absolute;width:1px;height:1px;opacity:0}
 
 .panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px}
 .panel h3{margin:0 0 4px;font-size:15.5px}
+.ph2{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px}
+.ph2 h3{margin:0;flex:1}
 .panel .sub{font-size:12.5px;color:var(--muted);line-height:1.7;margin-bottom:6px}
 .chs{margin-top:10px}
 .chs h4{margin:0;padding:5px 0;font-size:14.5px;border-bottom:2px solid var(--accent)}
@@ -139,6 +141,25 @@ button:focus-visible,input:focus-visible,select:focus-visible,label:focus-within
 #print .pd small{font-size:7.5pt;margin-left:2mm}
 #print .pi{font-size:7.2pt;line-height:1.28;padding-left:15.5mm;text-indent:-15.5mm;word-break:break-all}
 #print .pi span{display:inline-block;min-width:15.5mm;padding-right:1mm;text-indent:0;white-space:nowrap;font-variant-numeric:tabular-nums}
+/* 介舟で直す一覧（A4縦・件数に応じて複数ページ） */
+#print .pl{font-size:10pt;line-height:1.45}
+#print .lh{display:flex;align-items:flex-end;border-bottom:1.2pt solid #000;padding-bottom:1.5mm;margin-bottom:2mm}
+#print .lh .t1{font-size:15pt;font-weight:700}
+#print .lh .t2{font-size:12pt;font-weight:700;margin-left:6mm}
+#print .lh .t3{font-size:8.5pt;margin-left:auto;text-align:right}
+#print .ln{font-size:8.5pt;margin-bottom:3mm}
+#print table.lt{width:100%;border-collapse:collapse;table-layout:fixed;margin-bottom:4mm}
+#print table.lt th,#print table.lt td{border:0.6pt solid #000;padding:1mm 1.5mm;vertical-align:top;word-break:break-all}
+#print table.lt th{font-size:8.5pt;font-weight:700;background:#EEE;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+#print table.lt th.who{font-size:11pt;text-align:left;background:#DDE4E6}
+#print table.lt .c1{width:9mm;text-align:center}
+#print table.lt td.c1{font-size:12pt;line-height:1.1}
+#print table.lt .c2{width:17mm;font-size:9pt;font-weight:700}
+#print table.lt .c4{width:44mm;font-size:9pt}
+#print table.lt .wk{font-size:8pt;font-weight:700}
+#print table.lt tr{break-inside:avoid;page-break-inside:avoid}
+#print table.lt tr.done td{color:#777}
+#print table.lt thead{display:table-header-group}
 @media print{
   @page{size:A4 landscape;margin:7mm}
   html,body{background:#fff !important;padding:0 !important;margin:0 !important}
@@ -627,14 +648,10 @@ document.addEventListener("keydown", function(e){
 var GIDS = [];
 function toggleDoneI(i){ toggleDone(GIDS[i]); }
 function toggleDone(sg){ S.done[sg] = !S.done[sg]; save(); render(); }
-function listHTML(){
-  GIDS = [];
-  var list = changes();
-  var h = '<div class="panel"><h3>介舟で直す一覧</h3><div class="sub">ヘルパーさんに渡す表を作り終えたら、この一覧を見ながら介舟の予定を直してください。終わったものにチェックを付けると消し込めます。<br>'+
-    '同じ直しが<b>毎週</b>続いているものには「毎週」の印が付きます。介舟の<b>週間計画</b>も直しておくと、来月は直さずに済みます。</div>';
-  if(!list.length){ return h + '<div class="sub" style="margin-top:10px">まだ直したところはありません。</div></div>'; }
+// 直したところを「同じ直し（毎週続くもの）」ごとにまとめ、スタッフ順に並べる。画面と印刷で同じものを使う
+function changeGroups(){
   var groups = {};
-  list.forEach(function(x){
+  changes().forEach(function(x){
     var ref = x.o || x.c, w = dow(ref.d), g;
     if(x.kind==="add") g = ["add", x.k, w, x.c.st, x.c.en, norm(x.c.u), x.c.s].join("|");
     else if(x.kind==="del") g = ["del", x.k, w, x.o.st, x.o.en, norm(x.o.u)].join("|");
@@ -643,33 +660,78 @@ function listHTML(){
     if(!groups[g]) groups[g] = {sg:g, x:x, w:w, dates:[], first:ref.d, ids:[]};
     groups[g].dates.push(ref.d); groups[g].ids.push((x.o||x.c).id);
   });
+  var out = [];
   S.staff.forEach(function(stf){
     var gs = Object.keys(groups).map(function(g){ return groups[g]; }).filter(function(g){ return g.x.k===stf.k; })
       .sort(function(a,b){ return a.first-b.first || toMin((a.x.o||a.x.c).st)-toMin((b.x.o||b.x.c).st); });
     if(!gs.length) return;
-    h += '<div class="chs"><h4>'+esc(stf.n)+'</h4>';
     gs.forEach(function(g){
-      var x = g.x, o = x.o, c = x.c, k, tx;
-      var weekly = g.dates.length >= 2;
-      if(x.kind==="add"){ k='<span class="k add">追加</span>'; tx = esc(label(c)); }
-      else if(x.kind==="del"){ k='<span class="k del">削除</span>'; tx = esc(label(o)); }
-      else if(x.kind==="mv"){ k='<span class="k mv">担当変更</span>'; tx = esc(label(o))+' → <b>'+esc(staffName(c.k))+'さん</b>'+((c.st!==o.st||c.en!==o.en)?'（'+c.st+'-'+c.en+'）':'')+(c.d!==o.d?'（'+c.d+'日へ）':''); }
+      var x = g.x, o = x.o, c = x.c;
+      g.weekly = g.dates.length >= 2;
+      g.dates.sort(function(a,b){ return a-b; });
+      g.dateTx = g.dates.map(function(d){ return d+'日'; }).join('・');
+      if(x.kind==="add"){ g.kname='追加'; g.tx = esc(label(c)); }
+      else if(x.kind==="del"){ g.kname='削除'; g.tx = esc(label(o)); }
+      else if(x.kind==="mv"){ g.kname='担当変更'; g.tx = esc(label(o))+' → <b>'+esc(staffName(c.k))+'さん</b>'+((c.st!==o.st||c.en!==o.en)?'（'+c.st+'-'+c.en+'）':'')+(c.d!==o.d?'（'+c.d+'日へ）':''); }
       else{
-        k='<span class="k chg">変更</span>';
+        g.kname='変更';
         var parts = [];
         if(c.d!==o.d) parts.push(o.d+'日 → <b>'+c.d+'日</b>');
         if(c.st!==o.st||c.en!==o.en) parts.push(o.st+'-'+o.en+' → <b>'+c.st+'-'+c.en+'</b>');
         if(norm(c.u)!==norm(o.u)) parts.push(esc(o.u)+' → <b>'+esc(c.u)+'</b>');
         if(c.s!==o.s) parts.push('('+esc(o.s)+') → <b>('+esc(c.s)+')</b>');
-        tx = esc(o.u)+'　'+parts.join('、');
+        g.tx = esc(o.u)+'　'+parts.join('、');
       }
-      var dates = g.dates.sort(function(a,b){ return a-b; }).map(function(d){ return d+'日'; }).join('・');
+    });
+    out.push({stf:stf, gs:gs});
+  });
+  return out;
+}
+function listHTML(){
+  GIDS = [];
+  var all = changeGroups();
+  var h = '<div class="panel"><div class="ph2"><h3>介舟で直す一覧</h3>'+(all.length?'<button class="btn" onclick="printList()">この一覧を印刷</button>':'')+'</div>'+
+    '<div class="sub">ヘルパーさんに渡す表を作り終えたら、この一覧を見ながら介舟の予定を直してください。終わったものにチェックを付けると消し込めます。<br>'+
+    '同じ直しが<b>毎週</b>続いているものには「毎週」の印が付きます。介舟の<b>週間計画</b>も直しておくと、来月は直さずに済みます。</div>';
+  if(!all.length){ return h + '<div class="sub" style="margin-top:10px">まだ直したところはありません。</div></div>'; }
+  all.forEach(function(s){
+    h += '<div class="chs"><h4>'+esc(s.stf.n)+'</h4>';
+    s.gs.forEach(function(g){
       h += '<label class="ch'+(S.done[g.sg]?' done':'')+'"><input type="checkbox"'+(S.done[g.sg]?' checked':'')+' onchange="toggleDoneI('+(GIDS.push(g.sg)-1)+')">'+
-        '<span class="tx">'+k+tx+'<span class="dates">'+DOWJ[g.w]+'曜：'+dates+(weekly?'<span class="wk">毎週・週間計画も</span>':'')+'</span></span></label>';
+        '<span class="tx"><span class="k '+g.x.kind+'">'+g.kname+'</span>'+g.tx+'<span class="dates">'+DOWJ[g.w]+'曜：'+g.dateTx+(g.weekly?'<span class="wk">毎週・週間計画も</span>':'')+'</span></span></label>';
     });
     h += '</div>';
   });
   return h + '</div>';
+}
+function listPrintHTML(){
+  var all = changeGroups(), now = new Date(), n = 0, nd = 0;
+  all.forEach(function(s){ s.gs.forEach(function(g){ n++; if(S.done[g.sg]) nd++; }); });
+  var h = '<div class="pl"><div class="lh"><span class="t1">介舟で直す一覧</span><span class="t2">令和'+(S.y-2018)+'年'+S.m+'月</span>'+
+    '<span class="t3">印刷 '+now.getFullYear()+'/'+(now.getMonth()+1)+'/'+now.getDate()+'<br>全'+n+'件'+(nd?'（済 '+nd+'件）':'')+'</span></div>'+
+    '<div class="ln">直し終えたら □ にチェックを付けてください。「毎週」の印があるものは、介舟の週間計画も直すと来月は直さずに済みます。</div>';
+  all.forEach(function(s){
+    h += '<table class="lt"><colgroup><col class="c1"><col class="c2"><col><col class="c4"></colgroup><thead><tr><th colspan="4" class="who">'+esc(s.stf.n)+'　（'+s.gs.length+'件）</th></tr>'+
+      '<tr><th class="c1">済</th><th class="c2">種類</th><th>直す内容</th><th class="c4">曜日・日付</th></tr></thead><tbody>';
+    s.gs.forEach(function(g){
+      var d = !!S.done[g.sg];
+      h += '<tr class="'+(d?'done':'')+'"><td class="c1">'+(d?'☑':'☐')+'</td><td class="c2">'+g.kname+'</td><td>'+g.tx+'</td>'+
+        '<td class="c4">'+DOWJ[g.w]+'曜：'+g.dateTx+(g.weekly?'<div class="wk">毎週・週間計画も</div>':'')+'</td></tr>';
+    });
+    h += '</tbody></table>';
+  });
+  return h + '</div>';
+}
+function setPageSize(sz){
+  var s = document.getElementById("pgsize");
+  if(!s){ s = document.createElement("style"); s.id = "pgsize"; document.head.appendChild(s); }
+  s.textContent = "@media print{@page{size:"+sz+";margin:"+(sz.indexOf("portrait")>=0?"10mm":"7mm")+"}}";
+}
+function printList(){
+  setPageSize("A4 portrait");
+  document.getElementById("print").innerHTML = listPrintHTML();
+  var go = function(){ setTimeout(function(){ window.print(); }, 50); };
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(go); else go();
 }
 
 /* ---- LINE ---- */
@@ -731,6 +793,7 @@ function fitPages(){
   box.classList.remove("measure");
 }
 function doPrint(keys){
+  setPageSize("A4 landscape");
   document.getElementById("print").innerHTML = keys.map(pageHTML).join("");
   var go = function(){ fitPages(); setTimeout(function(){ window.print(); }, 50); };
   if(document.fonts && document.fonts.ready) document.fonts.ready.then(go); else go();
