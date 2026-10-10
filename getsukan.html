@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>月間スケジュール作成｜沖縄介護センター</title>
+<meta name="theme-color" content="#0B4F6C">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#E9EDEE; --card:#FFFFFF; --ink:#16262B; --muted:#67797F;
+  --line:#DDE4E6; --accent:#0E5A61; --green:#06C755;
+  --warn:#C2410C; --warn-bg:#FFF3E6; --warn-br:#F3C18E;
+  --add:#1D4F91; --add-bg:#E3EEFB; --add-br:#A9C6EC;
+  --sun:#C0392B; --sat:#1D5FA8;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"BIZ UDPGothic","Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
+  font-size:15px; line-height:1.5; -webkit-text-size-adjust:100%;
+  padding-bottom:calc(48px + env(safe-area-inset-bottom));
+}
+.wrap{max-width:1180px;margin:0 auto;padding:0 12px}
+header{background:var(--accent);color:#fff;padding:calc(14px + env(safe-area-inset-top)) 0 15px}
+header .wrap{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.htitle{font-size:17px;font-weight:700}
+.horg{font-size:12.5px;opacity:.75}
+.back{margin-left:auto;color:#fff;font-size:13px;opacity:.85}
+
+.drop{margin:14px 0 0;padding:18px 16px;background:var(--card);border:2px dashed #B7C4CC;border-radius:12px;text-align:center}
+.drop.over{border-color:var(--accent);background:#E9F1F5}
+.drop p{margin:0 0 10px;font-size:14px;color:var(--muted);line-height:1.8}
+.pick{display:inline-block;padding:12px 24px;background:var(--accent);color:#fff;border-radius:10px;font-size:15.5px;font-weight:700;cursor:pointer}
+input[type=file]{position:absolute;width:1px;height:1px;opacity:0}
+.err{background:#FDECEC;border:1px solid #F0B8B8;color:#8A2222;border-radius:10px;padding:10px 14px;margin-top:10px;font-size:14px;line-height:1.7}
+
+.top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:14px 0 0}
+.month{font-size:18px;font-weight:700;margin-right:6px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 0}
+.tab{padding:7px 12px;border:1px solid var(--line);border-radius:99px;background:#fff;color:var(--ink);font-family:inherit;font-size:14px;cursor:pointer}
+.tab.on{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+.tab i{font-style:normal;font-size:11.5px;margin-left:5px;padding:1px 6px;border-radius:99px;background:var(--warn-bg);color:var(--warn);font-weight:700}
+.tab.on i{background:rgba(255,255,255,.25);color:#fff}
+.btn{padding:8px 13px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--accent);font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer}
+.btn.main{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.quiet{color:var(--muted);font-weight:400}
+.btn.danger{color:#8A2222;border-color:#E4B9B9;font-weight:400}
+.btn:active{opacity:.75}
+.spacer{flex:1}
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin:10px 2px 0;font-size:12.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:4px}
+.legend b{display:inline-block;width:14px;height:10px;border-radius:3px;border:1px solid var(--line)}
+
+.cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:10px}
+.dh{text-align:center;font-size:13px;font-weight:700;padding:4px 0;border-radius:6px;background:#DDE4E6}
+.dh.sun{background:#F6D9D6;color:var(--sun)}.dh.sat{background:#D8E6F6;color:var(--sat)}
+.day{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:5px 5px 4px;min-height:96px;display:flex;flex-direction:column;gap:3px}
+.day.blank{background:transparent;border:none}
+.dnum{display:flex;align-items:baseline;gap:5px;font-size:13px;font-weight:700}
+.dnum small{font-size:11px;font-weight:400;color:var(--sun)}
+.dnum .dw{display:none;font-weight:400;color:var(--muted)}
+.day.sun .dnum,.day.hol .dnum{color:var(--sun)}.day.sat .dnum{color:var(--sat)}
+.it{display:block;width:100%;text-align:left;padding:3px 5px;border:1px solid transparent;border-radius:5px;background:#F4F7F8;color:var(--ink);font-family:inherit;font-size:12.5px;line-height:1.4;cursor:pointer;word-break:break-all}
+.it .t{font-variant-numeric:tabular-nums;color:var(--muted);margin-right:4px;white-space:nowrap}
+.it.chg{background:var(--warn-bg);border-color:var(--warn-br)}
+.it.add{background:var(--add-bg);border-color:var(--add-br)}
+.it.ov{box-shadow:inset 0 0 0 2px #D64545}
+.it.del{background:transparent;color:#9AA8AE;text-decoration:line-through;border-style:dashed;border-color:#D5DDE0}
+.it .from{display:block;font-size:11px;color:var(--warn)}
+.plus{margin-top:auto;align-self:flex-end;padding:1px 8px;border:1px dashed #B7C4CC;border-radius:6px;background:none;color:var(--accent);font-size:13px;cursor:pointer}
+@media(hover:hover){.it:hover{filter:brightness(.96)}.plus:hover{background:#E9F1F5}.btn:hover{background:#E3EDF2}.btn.main:hover{filter:brightness(1.1);background:var(--accent)}}
+@media(max-width:760px){
+  .cal{grid-template-columns:1fr}
+  .dh,.day.blank{display:none}
+  .day{min-height:0}
+  .dnum .dw{display:inline}
+}
+
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:12px}
+.panel h3{margin:0 0 4px;font-size:15.5px}
+.panel .sub{font-size:12.5px;color:var(--muted);line-height:1.7;margin-bottom:6px}
+.chs{margin-top:10px}
+.chs h4{margin:0;padding:5px 0;font-size:14.5px;border-bottom:2px solid var(--accent)}
+.ch{display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-bottom:1px dashed var(--line);cursor:pointer;font-size:14px;line-height:1.65}
+.ch input{flex:0 0 auto;width:19px;height:19px;margin:2px 0 0;accent-color:var(--accent)}
+.ch .k{display:inline-block;font-size:11.5px;font-weight:700;padding:1px 7px;border-radius:99px;margin-right:6px;vertical-align:1px}
+.k.add{background:var(--add-bg);color:var(--add)}.k.del{background:#FDECEC;color:#8A2222}.k.chg{background:var(--warn-bg);color:var(--warn)}.k.mv{background:#F3E8FA;color:#5B2A73}
+.ch .dates{display:block;font-size:12.5px;color:var(--muted)}
+.ch .wk{display:inline-block;margin-left:6px;font-size:11.5px;font-weight:700;color:#5B2A73;background:#F3E8FA;border-radius:99px;padding:1px 7px}
+.ch.done .tx{color:#9AA8AE;text-decoration:line-through}
+textarea.line{width:100%;min-height:260px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px;line-height:1.7;background:#F4FBF6}
+
+.mask{position:fixed;inset:0;background:rgba(10,25,30,.45);display:none;align-items:center;justify-content:center;z-index:40;padding:12px}
+.mask.on{display:flex}
+.dlg{background:#fff;border-radius:14px;width:100%;max-width:440px;max-height:92vh;overflow:auto;padding:16px}
+.dlg h3{margin:0 0 10px;font-size:16px}
+.fr{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.fr label{flex:0 0 64px;font-size:13px;color:var(--muted)}
+.fr input,.fr select{flex:1;min-width:0;padding:9px 10px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:15px;background:#fff;color:var(--ink)}
+.fr .tm{flex:0 1 92px}
+.bulk{display:flex;gap:8px;align-items:flex-start;margin:4px 0 12px;padding:9px 10px;background:#F3E8FA;border-radius:8px;font-size:13.5px;line-height:1.6;color:#4A2160}
+.bulk input{width:18px;height:18px;margin:2px 0 0;accent-color:#5B2A73;flex:0 0 auto}
+.orig{font-size:12.5px;color:var(--muted);margin:-2px 0 10px}
+.dbtns{display:flex;gap:8px;flex-wrap:wrap}
+.dbtns .btn{flex:1;padding:11px 8px;font-size:14.5px}
+.foot{margin:22px 2px 0;font-size:12.5px;color:var(--muted);line-height:1.8}
+.toast{position:fixed;left:50%;bottom:40px;transform:translateX(-50%) translateY(20px);background:#14212B;color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .18s,transform .18s;z-index:50}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+button:focus-visible,input:focus-visible,select:focus-visible,label:focus-within{outline:3px solid #F2A93B;outline-offset:2px}
+
+/* 印刷 */
+#print{display:none}
+@media print{
+  @page{size:A4 landscape;margin:7mm}
+  body{background:#fff;padding:0}
+  body > *:not(#print){display:none !important}
+  #print{display:block}
+  .pg{page-break-after:always;break-after:page;font-size:8.6pt;line-height:1.3;color:#000}
+  .pg:last-child{page-break-after:auto;break-after:auto}
+  .ph{display:flex;align-items:flex-end;margin-bottom:2mm}
+  .ph .t1{font-size:14pt;font-weight:700;text-decoration:underline}
+  .ph .t2{font-size:13pt;font-weight:700;margin-left:auto;margin-right:auto}
+  .ph .t3{font-size:8pt;text-align:right}
+  .pn{font-size:10pt;font-weight:700;margin-bottom:1.5mm}
+  table.pc{width:100%;border-collapse:collapse;table-layout:fixed}
+  table.pc th{border:0.6pt solid #000;font-weight:700;padding:0.6mm;font-size:9pt}
+  table.pc th.sun{background:#E8433A;color:#fff}table.pc th.sat{background:#2A8BD9;color:#fff}
+  table.pc td{border:0.6pt solid #000;vertical-align:top;padding:0.5mm 0.7mm;height:24mm}
+  table.pc td.hol .pd{background:#FBE1D5}
+  .pd{font-size:8pt;margin-bottom:0.4mm}
+  .pd small{font-size:7.5pt;margin-left:2mm}
+  .pi{font-size:7.2pt;line-height:1.28;padding-left:15.5mm;text-indent:-15.5mm;word-break:break-all}
+  .pi span{display:inline-block;width:15.5mm;text-indent:0;font-variant-numeric:tabular-nums}
+}
+</style>
+</head>
+<body>
+
+<header><div class="wrap">
+  <span class="htitle">月間スケジュール作成</span>
+  <span class="horg">沖縄介護センター</span>
+  <a class="back" href="./">← 毎日の送信へ</a>
+</div></header>
+
+<div class="wrap" id="app">
+  <div class="drop" id="drop">
+    <p>介舟の「スタッフ月間スケジュール表」（Excel）を選んでください。何人分でもまとめて選べます。<br>
+    読み込んだあと、画面で予定を直して、ヘルパーさんに渡す表を作ります。直したところは「介舟で直す一覧」にまとまります。</p>
+    <label class="pick" tabindex="0">
+      月間スケジュール表を選ぶ
+      <input type="file" id="file" accept=".xlsx,.xls" multiple>
+    </label>
+  </div>
+  <div id="msgs"></div>
+  <div id="out"></div>
+  <p class="foot">
+    ファイルはこの端末の中だけで処理され、どこにも送信されません。直した内容はこの端末のブラウザに保存され、閉じても続きから作業できます。<br>
+    「担会（　）」の枠は予定として扱いません。
+  </p>
+</div>
+
+<div class="mask" id="mask" onclick="if(event.target===this)closeDlg()"><div class="dlg" id="dlg"></div></div>
+<div class="toast" id="toast"></div>
+<div id="print"></div>
+
+<script>
+var DOWJ = ["日","月","火","水","木","金","土"];
+var TIME = /^\s*\d{1,2}:\d{2}\s*-\s*\d{1,2}:\d{2}\s*$/;
+var S = null;       // {y,m,tel,org,staff:[{k,n}],items:[],orig:[],hol:{},seq,done:{}}
+var CUR = "";       // 表示中のスタッフ key
+var VIEW = "cal";   // cal | list | line
+var MSGS = [];
+var EDIT = null;
+
+function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m];}); }
+function clean(s){ return String(s==null?"":s).replace(/\u3000/g," ").replace(/\s+/g," ").trim(); }
+function norm(s){ return String(s==null?"":s).replace(/[\s\u3000]/g,"").replace(/様$/,""); }
+function toMin(t){ var p=String(t).split(":").map(Number); return p[0]*60+(p[1]||0); }
+function pad(n){ return (n<10?"0":"")+n; }
+function hhmm(t){ var m=toMin(t); return pad(Math.floor(m/60))+":"+pad(m%60); }
+function normTime(t){
+  t = String(t||"").replace(/[０-９：]/g,function(c){ return c==="："?":":String.fromCharCode(c.charCodeAt(0)-0xFEE0); }).replace(/\s/g,"");
+  var m = t.match(/^(\d{1,2}):?(\d{2})$/);
+  if(!m) return "";
+  var h=+m[1], mi=+m[2];
+  if(h>23||mi>59) return "";
+  return pad(h)+":"+pad(mi);
+}
+function sig(v){ return v.st+"-"+v.en+"|"+norm(v.u)+"|"+v.s; }
+function dow(d){ return new Date(S.y, S.m-1, d).getDay(); }
+function days(){ return new Date(S.y, S.m, 0).getDate(); }
+function staffName(k){ for(var i=0;i<S.staff.length;i++) if(S.staff[i].k===k) return S.staff[i].n; return k; }
+function label(v){ return v.st+"-"+v.en+" "+v.u+(v.s?"("+v.s+")":""); }
+function toast(msg){ var t=document.getElementById("toast"); t.textContent=msg; t.classList.add("on"); clearTimeout(t._h); t._h=setTimeout(function(){ t.classList.remove("on"); },2200); }
+
+/* ---- 保存 ---- */
+function key(){ return "getsu_"+S.y+"-"+pad(S.m); }
+function save(){
+  if(!S) return;
+  try{ localStorage.setItem(key(), JSON.stringify(S)); localStorage.setItem("getsu_last", key()); }catch(e){}
+}
+function restore(){
+  try{
+    var k = localStorage.getItem("getsu_last");
+    if(!k) return;
+    var v = JSON.parse(localStorage.getItem(k)||"null");
+    if(v && v.items){ S = v; CUR = (S.staff[0]||{}).k||""; }
+  }catch(e){}
+}
+function clearAll(){
+  if(!S) return;
+  if(!confirm(S.m+"月の読み込みと直した内容をすべて消しますか？")) return;
+  try{ localStorage.removeItem(key()); localStorage.removeItem("getsu_last"); }catch(e){}
+  S = null; CUR = ""; render(); toast("消しました");
+}
+
+/* ---- 読み取り ---- */
+function parseSheet(rows){
+  var out = [], cur = null, cols = null, ym = null, tel = "", org = "";
+  rows.forEach(function(row){
+    row = row || [];
+    var cm = {}, hits = 0;
+    row.forEach(function(c,j){ var t=clean(c); if(t.length===1 && DOWJ.indexOf(t)>=0){ cm[j]=DOWJ.indexOf(t); hits++; } });
+    if(hits >= 5){ cols = cm; if(cur) cur.cols = cm; return; }
+    var isName = false;
+    row.forEach(function(c){
+      var raw = String(c==null?"":c); if(/\n/.test(raw)) return;
+      var t = clean(raw);
+      var m = t.match(/令和\s*(\d+)\s*年\s*(\d+)\s*月/);
+      if(m && !ym) ym = {y:2018+(+m[1]), m:+m[2]};
+      if(/^TEL/i.test(t)) tel = t;
+      if(/有限会社|株式会社|センター/.test(t) && !/様$/.test(t)) org = t;
+      if(/様$/.test(t) && t.length <= 24 && !isName){
+        cur = {n:t.replace(/\s*様$/,""), items:[], hol:{}, cols:null, dmap:{}};
+        out.push(cur); isName = true;
+      }
+    });
+    if(isName || !cur || !cols) return;
+    var dateRow = false;
+    Object.keys(cols).forEach(function(j){
+      var m = clean(row[j]).match(/^(\d{1,2})\s*日$/);
+      if(m){ dateRow = true; }
+    });
+    if(dateRow){
+      cur.dmap = {};
+      Object.keys(cols).forEach(function(j){
+        j = +j;
+        var m = clean(row[j]).match(/^(\d{1,2})\s*日$/);
+        if(m){
+          cur.dmap[j] = +m[1];
+          for(var x=j+1;x<=j+3;x++){ var h=clean(row[x]); if(h && !TIME.test(h) && !/^\d+\s*日$/.test(h)) { cur.hol[+m[1]] = h; break; } }
+        }
+      });
+      return;
+    }
+    Object.keys(cur.dmap).forEach(function(j){
+      j = +j;
+      var t = clean(row[j]);
+      if(!TIME.test(t)) return;
+      var txt = clean(row[j+2]) || clean(row[j+1]);
+      if(!txt || /^担\s*会/.test(txt)) return;
+      var mm = txt.match(/^(.*?)\s*[（(]([^()（）]*)[)）]\s*$/);
+      var u = mm ? mm[1] : txt, s = mm ? mm[2] : "";
+      var p = t.split("-");
+      cur.items.push({d:cur.dmap[j], st:hhmm(p[0]), en:hhmm(p[1]), u:clean(u), s:clean(s)});
+    });
+  });
+  return {staff:out, ym:ym, tel:tel, org:org};
+}
+
+function addFiles(files){
+  MSGS = [];
+  var list = Array.prototype.slice.call(files||[]);
+  if(!list.length) return;
+  var left = list.length, got = [];
+  list.forEach(function(f){
+    var rd = new FileReader();
+    rd.onload = function(e){
+      try{
+        var wb = XLSX.read(new Uint8Array(e.target.result), {type:"array"});
+        var any = false;
+        wb.SheetNames.forEach(function(sn){
+          var r = parseSheet(XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1, defval:"", raw:false}));
+          if(r.staff.length && r.ym){ any = true; r.file = f.name; got.push(r); }
+        });
+        if(!any) MSGS.push(f.name+"：スタッフ月間スケジュール表として読み取れませんでした（「令和◯年◯月」、スタッフ名「〇〇 様」、曜日の見出しが見つかりません）");
+      }catch(err){ MSGS.push(f.name+"：読み込めませんでした（"+err.message+"）"); }
+      if(--left===0) merge(got);
+    };
+    rd.readAsArrayBuffer(f);
+  });
+}
+function merge(got){
+  if(!got.length){ render(); return; }
+  var ym = got[0].ym;
+  var other = got.filter(function(r){ return r.ym.y!==ym.y || r.ym.m!==ym.m; });
+  if(other.length) MSGS.push("違う月のファイルが混ざっていたため、"+ym.m+"月以外は読み込みませんでした："+other.map(function(r){ return r.file; }).join("、"));
+  got = got.filter(function(r){ return r.ym.y===ym.y && r.ym.m===ym.m; });
+  if(S && (S.y!==ym.y || S.m!==ym.m)){
+    if(!confirm("今は "+S.m+"月 を作業中です。"+ym.m+"月 を読み込むと、"+S.m+"月 の作業は画面から外れます（端末には残ります）。読み込みますか？")){ render(); return; }
+    save(); S = null;
+  }
+  if(!S){
+    try{ var old = JSON.parse(localStorage.getItem("getsu_"+ym.y+"-"+pad(ym.m))||"null"); if(old && old.items) S = old; }catch(e){}
+  }
+  if(!S) S = {y:ym.y, m:ym.m, tel:"", org:"", staff:[], items:[], orig:[], hol:{}, seq:1, done:{}};
+  var added = 0;
+  got.forEach(function(r){
+    if(r.tel) S.tel = r.tel; if(r.org) S.org = r.org;
+    r.staff.forEach(function(st){
+      var k = norm(st.n);
+      var exists = S.staff.some(function(x){ return x.k===k; });
+      if(exists){
+        var touched = S.items.some(function(v){ return v.k===k || v.ok===k; }) && hasChanges(k);
+        if(touched && !confirm(st.n+" さんは読み込み済みで、直した内容があります。読み込み直すと、この人の直した内容は消えます。読み込み直しますか？")) return;
+        S.items = S.items.filter(function(v){ return v.ok!==k; });
+        S.orig = S.orig.filter(function(v){ return v.k!==k; });
+      }else{
+        S.staff.push({k:k, n:st.n});
+      }
+      Object.keys(st.hol).forEach(function(d){ S.hol[d] = st.hol[d]; });
+      st.items.forEach(function(v){
+        var o = {id:S.seq++, k:k, ok:k, d:v.d, st:v.st, en:v.en, u:v.u, s:v.s};
+        S.orig.push(JSON.parse(JSON.stringify(o)));
+        S.items.push(o);
+      });
+      added++;
+      if(!CUR) CUR = k;
+    });
+  });
+  if(added && !CUR) CUR = S.staff[0].k;
+  save(); render();
+  if(added) toast(added+"人分を読み込みました");
+}
+
+/* ---- 差分 ---- */
+function origOf(id){ for(var i=0;i<S.orig.length;i++) if(S.orig[i].id===id) return S.orig[i]; return null; }
+function itemOf(id){ for(var i=0;i<S.items.length;i++) if(S.items[i].id===id) return S.items[i]; return null; }
+function stateOf(v){
+  var o = origOf(v.id);
+  if(!o) return "add";
+  if(o.k!==v.k || o.d!==v.d || o.st!==v.st || o.en!==v.en || norm(o.u)!==norm(v.u) || o.s!==v.s) return "chg";
+  return "";
+}
+function changes(){
+  var list = [];
+  S.orig.forEach(function(o){
+    var c = itemOf(o.id);
+    if(!c){ list.push({kind:"del", k:o.k, o:o, c:null}); return; }
+    if(c.k!==o.k){ list.push({kind:"mv", k:o.k, o:o, c:c}); return; }
+    if(stateOf(c)==="chg") list.push({kind:"chg", k:o.k, o:o, c:c});
+  });
+  S.items.forEach(function(c){ if(!origOf(c.id)) list.push({kind:"add", k:c.k, o:null, c:c}); });
+  return list;
+}
+function hasChanges(k){ return changes().some(function(x){ return x.k===k || (x.c && x.c.k===k); }); }
+function changeCount(k){ return changes().filter(function(x){ return x.k===k || (x.kind==="mv" && x.c.k===k); }).length; }
+
+/* ---- 画面 ---- */
+function setCurI(i){ setCur(S.staff[i].k); }
+function setCur(k){ CUR = k; if(VIEW==="line") VIEW="cal"; render(); }
+function setView(v){ VIEW = v; render(); if(v!=="cal") window.scrollTo(0, document.getElementById("out").offsetTop-10); }
+
+function overlaps(list){
+  var bad = {};
+  var a = list.slice().sort(function(x,y){ return toMin(x.st)-toMin(y.st); });
+  for(var i=0;i<a.length;i++) for(var j=i+1;j<a.length;j++){
+    if(toMin(a[j].st) < toMin(a[i].en)){ bad[a[i].id]=1; bad[a[j].id]=1; }
+  }
+  return bad;
+}
+function dayItems(k, d){
+  return S.items.filter(function(v){ return v.k===k && v.d===d; }).sort(function(a,b){ return toMin(a.st)-toMin(b.st); });
+}
+function deletedOn(k, d){
+  return S.orig.filter(function(o){
+    if(o.k!==k || o.d!==d) return false;
+    var c = itemOf(o.id);
+    return !c || c.k!==k || c.d!==d;
+  });
+}
+
+function render(){
+  var msgs = document.getElementById("msgs");
+  msgs.innerHTML = MSGS.map(function(m){ return '<div class="err">'+esc(m)+'</div>'; }).join("");
+  var out = document.getElementById("out");
+  if(!S || !S.staff.length){ out.innerHTML = ""; return; }
+  if(!S.staff.some(function(x){ return x.k===CUR; })) CUR = S.staff[0].k;
+  var nChg = changes().length;
+  var h = '<div class="top"><span class="month">令和'+(S.y-2018)+'年'+S.m+'月</span>'+
+    '<button class="btn'+(VIEW==="cal"?' main':'')+'" onclick="setView(\'cal\')">予定を直す</button>'+
+    '<button class="btn'+(VIEW==="list"?' main':'')+'" onclick="setView(\'list\')">介舟で直す一覧'+(nChg?'（'+nChg+'）':'')+'</button>'+
+    '<span class="spacer"></span>'+
+    '<button class="btn" onclick="printOne()">この人を印刷</button>'+
+    '<button class="btn" onclick="printAll()">全員を印刷</button>'+
+    '<button class="btn" onclick="setView(\'line\')">LINEの文面</button>'+
+    '<button class="btn danger" onclick="clearAll()">消す</button></div>';
+  if(VIEW!=="list"){
+    h += '<div class="tabs">'+S.staff.map(function(x){
+      var n = changeCount(x.k);
+      return '<button class="tab'+(x.k===CUR?' on':'')+'" onclick="setCurI('+S.staff.indexOf(x)+')">'+esc(x.n)+(n?'<i>'+n+'</i>':'')+'</button>';
+    }).join("")+'</div>';
+  }
+  if(VIEW==="cal") h += calHTML(CUR);
+  else if(VIEW==="list") h += listHTML();
+  else h += lineHTML(CUR);
+  out.innerHTML = h;
+}
+
+function calHTML(k){
+  var h = '<div class="legend"><span><b style="background:var(--add-bg);border-color:var(--add-br)"></b>追加</span>'+
+    '<span><b style="background:var(--warn-bg);border-color:var(--warn-br)"></b>変更</span>'+
+    '<span><b style="border-style:dashed"></b>消した予定（押すと戻せます）</span>'+
+    '<span><b style="box-shadow:inset 0 0 0 2px #D64545"></b>時間の重なり</span>'+
+    '<span>予定を押すと直せます</span></div>';
+  h += '<div class="cal">';
+  DOWJ.forEach(function(w,i){ h += '<div class="dh'+(i===0?' sun':i===6?' sat':'')+'">'+w+'</div>'; });
+  var first = dow(1);
+  for(var b=0;b<first;b++) h += '<div class="day blank"></div>';
+  for(var d=1; d<=days(); d++){
+    var w = dow(d), hol = S.hol[d];
+    var list = dayItems(k, d), ov = overlaps(list), dels = deletedOn(k, d);
+    h += '<div class="day'+(w===0?' sun':w===6?' sat':'')+(hol?' hol':'')+'"><div class="dnum">'+d+'日<span class="dw">（'+DOWJ[w]+'）</span>'+(hol?'<small>'+esc(hol)+'</small>':'')+'</div>';
+    list.forEach(function(v){
+      var st = stateOf(v), o = origOf(v.id), from = "";
+      if(st==="chg" && o){
+        if(o.k!==v.k) from = staffName(o.k)+"さんから";
+        else if(o.d!==v.d) from = o.d+"日から移動";
+        else if(o.st!==v.st || o.en!==v.en) from = "元 "+o.st+"-"+o.en;
+        else from = "元 "+o.u+(o.s?"("+o.s+")":"");
+      }
+      h += '<button class="it '+st+(ov[v.id]?' ov':'')+'" onclick="openEdit('+v.id+')"><span class="t">'+v.st+'-'+v.en+'</span>'+esc(v.u)+(v.s?'('+esc(v.s)+')':'')+
+        (from?'<span class="from">'+esc(from)+'</span>':'')+'</button>';
+    });
+    dels.forEach(function(o){
+      var c = itemOf(o.id), why = !c ? "" : (c.k!==o.k ? "→ "+staffName(c.k)+"さんへ" : "→ "+c.d+"日へ");
+      h += '<button class="it del" onclick="restoreItem('+o.id+')" title="押すと元に戻します"><span class="t">'+o.st+'-'+o.en+'</span>'+esc(o.u)+(why?' '+esc(why):'')+'</button>';
+    });
+    h += '<button class="plus" onclick="openAdd('+d+')" title="この日に予定を足す">＋</button></div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+/* ---- 編集 ---- */
+function staffOptions(sel){
+  return S.staff.map(function(x){ return '<option value="'+esc(x.k)+'"'+(x.k===sel?' selected':'')+'>'+esc(x.n)+'</option>'; }).join("");
+}
+function dayOptions(sel){
+  var h = "";
+  for(var d=1; d<=days(); d++) h += '<option value="'+d+'"'+(d===sel?' selected':'')+'>'+d+'日（'+DOWJ[dow(d)]+'）</option>';
+  return h;
+}
+function sameLater(v){
+  return S.items.filter(function(x){
+    return x.id!==v.id && x.k===v.k && x.d>v.d && dow(x.d)===dow(v.d) && x.st===v.st && x.en===v.en && norm(x.u)===norm(v.u);
+  });
+}
+function userList(){
+  var seen = {}, out = [];
+  S.items.concat(S.orig).forEach(function(v){ var n=norm(v.u); if(!seen[n]){ seen[n]=1; out.push(v.u); } });
+  return out.sort();
+}
+function svcList(){
+  var seen = {}, out = [];
+  S.items.concat(S.orig).forEach(function(v){ if(v.s && !seen[v.s]){ seen[v.s]=1; out.push(v.s); } });
+  return out.sort();
+}
+function dlgHTML(v, isNew){
+  var o = isNew ? null : origOf(v.id);
+  var later = isNew ? [] : sameLater(v);
+  return '<h3>'+(isNew?'予定を足す':'予定を直す')+'</h3>'+
+    (o && stateOf(v) ? '<div class="orig">介舟の予定：'+esc(staffName(o.k))+'　'+o.d+'日　'+esc(label(o))+'</div>' : '')+
+    '<div class="fr"><label>日付</label><select id="f_d">'+dayOptions(v.d)+'</select></div>'+
+    '<div class="fr"><label>時刻</label><input class="tm" id="f_st" value="'+esc(v.st)+'" placeholder="08:30" inputmode="numeric"><span>〜</span><input class="tm" id="f_en" value="'+esc(v.en)+'" placeholder="09:00" inputmode="numeric"></div>'+
+    '<div class="fr"><label>利用者</label><input id="f_u" list="ulist" value="'+esc(v.u)+'"></div>'+
+    '<div class="fr"><label>サービス</label><input id="f_s" list="slist" value="'+esc(v.s)+'" placeholder="介身・介通・障移身 など"></div>'+
+    '<div class="fr"><label>担当</label><select id="f_k">'+staffOptions(v.k)+'</select></div>'+
+    '<datalist id="ulist">'+userList().map(function(u){ return '<option value="'+esc(u)+'">'; }).join("")+'</datalist>'+
+    '<datalist id="slist">'+svcList().map(function(s){ return '<option value="'+esc(s)+'">'; }).join("")+'</datalist>'+
+    (later.length ? '<label class="bulk"><input type="checkbox" id="f_all"><span>この日より後の<b>毎週'+DOWJ[dow(v.d)]+'曜</b>の同じ予定（'+later.map(function(x){ return x.d+'日'; }).join('・')+'）も同じように直す</span></label>' : '')+
+    '<div class="dbtns">'+
+      '<button class="btn main" onclick="saveEdit()">'+(isNew?'足す':'直す')+'</button>'+
+      (isNew ? '' : '<button class="btn danger" onclick="delEdit()">この予定を消す</button>')+
+      '<button class="btn quiet" onclick="closeDlg()">やめる</button>'+
+    '</div>';
+}
+function openEdit(id){
+  var v = itemOf(id); if(!v) return;
+  EDIT = {id:id, isNew:false};
+  document.getElementById("dlg").innerHTML = dlgHTML(v, false);
+  document.getElementById("mask").classList.add("on");
+}
+function openAdd(d){
+  EDIT = {id:null, isNew:true};
+  document.getElementById("dlg").innerHTML = dlgHTML({d:d, st:"", en:"", u:"", s:"", k:CUR}, true);
+  document.getElementById("mask").classList.add("on");
+  setTimeout(function(){ var e=document.getElementById("f_st"); if(e) e.focus(); }, 50);
+}
+function closeDlg(){ document.getElementById("mask").classList.remove("on"); EDIT = null; }
+function readForm(){
+  var st = normTime(document.getElementById("f_st").value), en = normTime(document.getElementById("f_en").value);
+  var u = clean(document.getElementById("f_u").value), s = clean(document.getElementById("f_s").value);
+  if(!st || !en){ alert("時刻は「8:30」や「0830」のように入れてください。"); return null; }
+  if(toMin(en) <= toMin(st)){ alert("終わりの時刻が始まりより前になっています。"); return null; }
+  if(!u){ alert("利用者名を入れてください。"); return null; }
+  return {d:+document.getElementById("f_d").value, st:st, en:en, u:u, s:s, k:document.getElementById("f_k").value};
+}
+function saveEdit(){
+  var f = readForm(); if(!f) return;
+  if(EDIT.isNew){
+    S.items.push({id:S.seq++, k:f.k, ok:"", d:f.d, st:f.st, en:f.en, u:f.u, s:f.s});
+    if(f.k!==CUR) CUR = f.k;
+  }else{
+    var v = itemOf(EDIT.id);
+    var all = document.getElementById("f_all"), later = (all && all.checked) ? sameLater(v) : [];
+    var dd = f.d - v.d;
+    later.forEach(function(x){ x.st=f.st; x.en=f.en; x.u=f.u; x.s=f.s; x.k=f.k; if(dd){ var nd=x.d+dd; if(nd>=1 && nd<=days()) x.d=nd; } });
+    v.d=f.d; v.st=f.st; v.en=f.en; v.u=f.u; v.s=f.s; v.k=f.k;
+    if(later.length) toast((later.length+1)+"件をまとめて直しました");
+  }
+  save(); closeDlg(); render();
+}
+function delEdit(){
+  var v = itemOf(EDIT.id); if(!v) return;
+  var all = document.getElementById("f_all"), later = (all && all.checked) ? sameLater(v) : [];
+  var ids = [v.id].concat(later.map(function(x){ return x.id; }));
+  S.items = S.items.filter(function(x){ return ids.indexOf(x.id)<0; });
+  save(); closeDlg(); render();
+  toast(ids.length>1 ? ids.length+"件を消しました" : "消しました（点線の予定を押すと戻せます）");
+}
+function restoreItem(id){
+  var o = origOf(id); if(!o) return;
+  if(!confirm("介舟の予定（"+o.d+"日 "+label(o)+"）に戻しますか？")) return;
+  S.items = S.items.filter(function(x){ return x.id!==id; });
+  S.items.push(JSON.parse(JSON.stringify(o)));
+  save(); render();
+}
+document.addEventListener("keydown", function(e){
+  if(!EDIT) return;
+  if(e.key==="Escape") closeDlg();
+  if(e.key==="Enter" && e.target.tagName==="INPUT") saveEdit();
+});
+
+/* ---- 介舟で直す一覧 ---- */
+var GIDS = [];
+function toggleDoneI(i){ toggleDone(GIDS[i]); }
+function toggleDone(sg){ S.done[sg] = !S.done[sg]; save(); render(); }
+function listHTML(){
+  GIDS = [];
+  var list = changes();
+  var h = '<div class="panel"><h3>介舟で直す一覧</h3><div class="sub">ヘルパーさんに渡す表を作り終えたら、この一覧を見ながら介舟の予定を直してください。終わったものにチェックを付けると消し込めます。<br>'+
+    '同じ直しが<b>毎週</b>続いているものには「毎週」の印が付きます。介舟の<b>週間計画</b>も直しておくと、来月は直さずに済みます。</div>';
+  if(!list.length){ return h + '<div class="sub" style="margin-top:10px">まだ直したところはありません。</div></div>'; }
+  var groups = {};
+  list.forEach(function(x){
+    var ref = x.o || x.c, w = dow(ref.d), g;
+    if(x.kind==="add") g = ["add", x.k, w, x.c.st, x.c.en, norm(x.c.u), x.c.s].join("|");
+    else if(x.kind==="del") g = ["del", x.k, w, x.o.st, x.o.en, norm(x.o.u)].join("|");
+    else if(x.kind==="mv") g = ["mv", x.k, w, x.o.st, x.o.en, norm(x.o.u), x.c.k, x.c.st, x.c.en, x.c.d-x.o.d].join("|");
+    else g = ["chg", x.k, w, x.o.st, x.o.en, norm(x.o.u), x.c.st, x.c.en, norm(x.c.u), x.c.s, x.c.d-x.o.d].join("|");
+    if(!groups[g]) groups[g] = {sg:g, x:x, w:w, dates:[], first:ref.d, ids:[]};
+    groups[g].dates.push(ref.d); groups[g].ids.push((x.o||x.c).id);
+  });
+  S.staff.forEach(function(stf){
+    var gs = Object.keys(groups).map(function(g){ return groups[g]; }).filter(function(g){ return g.x.k===stf.k; })
+      .sort(function(a,b){ return a.first-b.first || toMin((a.x.o||a.x.c).st)-toMin((b.x.o||b.x.c).st); });
+    if(!gs.length) return;
+    h += '<div class="chs"><h4>'+esc(stf.n)+'</h4>';
+    gs.forEach(function(g){
+      var x = g.x, o = x.o, c = x.c, k, tx;
+      var weekly = g.dates.length >= 2;
+      if(x.kind==="add"){ k='<span class="k add">追加</span>'; tx = esc(label(c)); }
+      else if(x.kind==="del"){ k='<span class="k del">削除</span>'; tx = esc(label(o)); }
+      else if(x.kind==="mv"){ k='<span class="k mv">担当変更</span>'; tx = esc(label(o))+' → <b>'+esc(staffName(c.k))+'さん</b>'+((c.st!==o.st||c.en!==o.en)?'（'+c.st+'-'+c.en+'）':'')+(c.d!==o.d?'（'+c.d+'日へ）':''); }
+      else{
+        k='<span class="k chg">変更</span>';
+        var parts = [];
+        if(c.d!==o.d) parts.push(o.d+'日 → <b>'+c.d+'日</b>');
+        if(c.st!==o.st||c.en!==o.en) parts.push(o.st+'-'+o.en+' → <b>'+c.st+'-'+c.en+'</b>');
+        if(norm(c.u)!==norm(o.u)) parts.push(esc(o.u)+' → <b>'+esc(c.u)+'</b>');
+        if(c.s!==o.s) parts.push('('+esc(o.s)+') → <b>('+esc(c.s)+')</b>');
+        tx = esc(o.u)+'　'+parts.join('、');
+      }
+      var dates = g.dates.sort(function(a,b){ return a-b; }).map(function(d){ return d+'日'; }).join('・');
+      h += '<label class="ch'+(S.done[g.sg]?' done':'')+'"><input type="checkbox"'+(S.done[g.sg]?' checked':'')+' onchange="toggleDoneI('+(GIDS.push(g.sg)-1)+')">'+
+        '<span class="tx">'+k+tx+'<span class="dates">'+DOWJ[g.w]+'曜：'+dates+(weekly?'<span class="wk">毎週・週間計画も</span>':'')+'</span></span></label>';
+    });
+    h += '</div>';
+  });
+  return h + '</div>';
+}
+
+/* ---- LINE ---- */
+function lineText(k){
+  var t = staffName(k)+"さん\n"+S.m+"月のスケジュールです。\n";
+  for(var d=1; d<=days(); d++){
+    var list = dayItems(k, d);
+    if(!list.length) continue;
+    t += "\n"+S.m+"/"+d+"（"+DOWJ[dow(d)]+"）"+(S.hol[d]?" "+S.hol[d]:"")+"\n";
+    list.forEach(function(v){ t += label(v)+"\n"; });
+  }
+  return t + "\nよろしくお願い致します。";
+}
+function lineHTML(k){
+  return '<div class="panel"><h3>'+esc(staffName(k))+'さんに送る文面</h3><div class="sub">1か月分を日付順に並べています（予定のない日は省いています）。</div>'+
+    '<textarea class="line" id="ltext">'+esc(lineText(k))+'</textarea>'+
+    '<div class="dbtns" style="margin-top:8px"><button class="btn main" onclick="sendLine()">'+(navigator.share && /iPhone|iPad|Android/i.test(navigator.userAgent)?'LINEなどで送る':'コピーする')+'</button></div></div>';
+}
+function sendLine(){
+  var t = document.getElementById("ltext").value;
+  if(navigator.share && /iPhone|iPad|Android/i.test(navigator.userAgent)){ navigator.share({text:t}).catch(function(){}); return; }
+  if(navigator.clipboard){ navigator.clipboard.writeText(t).then(function(){ toast("コピーしました。LINEに貼り付けてください"); }); return; }
+  var ta = document.getElementById("ltext"); ta.select(); try{ document.execCommand("copy"); toast("コピーしました"); }catch(e){}
+}
+
+/* ---- 印刷 ---- */
+function pageHTML(k){
+  var h = '<div class="pg"><div class="ph"><span class="t1">スタッフ月間スケジュール表</span><span class="t2">令和'+(S.y-2018)+'年'+S.m+'月</span><span class="t3">'+esc(S.tel)+'<br>'+esc(S.org||"有限会社 沖縄介護センター")+'</span></div>'+
+    '<div class="pn">'+esc(staffName(k))+'　様</div><table class="pc"><tr>';
+  DOWJ.forEach(function(w,i){ h += '<th class="'+(i===0?'sun':i===6?'sat':'')+'">'+w+'</th>'; });
+  h += '</tr><tr>';
+  var first = dow(1), col = 0;
+  for(var b=0;b<first;b++){ h += '<td></td>'; col++; }
+  for(var d=1; d<=days(); d++){
+    h += '<td class="'+(S.hol[d]?'hol':'')+'"><div class="pd">'+d+'日'+(S.hol[d]?'<small>'+esc(S.hol[d])+'</small>':'')+'</div>'+
+      dayItems(k, d).map(function(v){ return '<div class="pi"><span>'+v.st+'-'+v.en+'</span>'+esc(v.u)+(v.s?'('+esc(v.s)+')':'')+'</div>'; }).join("")+'</td>';
+    col++;
+    if(col%7===0 && d<days()) h += '</tr><tr>';
+  }
+  while(col%7!==0){ h += '<td></td>'; col++; }
+  return h + '</tr></table></div>';
+}
+function doPrint(keys){
+  document.getElementById("print").innerHTML = keys.map(pageHTML).join("");
+  setTimeout(function(){ window.print(); }, 50);
+}
+function printOne(){ doPrint([CUR]); }
+function printAll(){ doPrint(S.staff.map(function(x){ return x.k; })); }
+
+/* ---- はじまり ---- */
+var drop = document.getElementById("drop");
+document.getElementById("file").addEventListener("change", function(e){ addFiles(e.target.files); e.target.value=""; });
+["dragenter","dragover"].forEach(function(ev){ drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.add("over"); }); });
+["dragleave","drop"].forEach(function(ev){ drop.addEventListener(ev, function(e){ e.preventDefault(); drop.classList.remove("over"); }); });
+drop.addEventListener("drop", function(e){ addFiles(e.dataTransfer.files); });
+restore();
+render();
+</script>
+</body>
+</html>
