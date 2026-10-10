@@ -113,29 +113,32 @@ textarea.line{width:100%;min-height:260px;padding:10px 12px;border:1px solid var
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 button:focus-visible,input:focus-visible,select:focus-visible,label:focus-within{outline:3px solid #F2A93B;outline-offset:2px}
 
-/* 印刷 */
-#print{display:none}
+/* 印刷（#print は画面では見えない。印刷前に1ページに収まるよう縮める） */
+#print{display:none;color:#000;background:#fff}
+#print.measure{display:block;position:absolute;left:-20000px;top:0;width:283mm}
+#print .pg{font-size:8.6pt;line-height:1.3;width:283mm}
+#print .ph{display:flex;align-items:flex-end;margin-bottom:2mm}
+#print .ph .t1{font-size:14pt;font-weight:700;text-decoration:underline}
+#print .ph .t2{font-size:13pt;font-weight:700;margin-left:auto;margin-right:auto}
+#print .ph .t3{font-size:8pt;text-align:right}
+#print .pn{font-size:10pt;font-weight:700;margin-bottom:1.5mm}
+#print table.pc{width:100%;border-collapse:collapse;table-layout:fixed}
+#print table.pc th{border:0.6pt solid #000;font-weight:700;padding:0.6mm;font-size:9pt}
+#print table.pc th.sun{background:#E8433A;color:#fff}
+#print table.pc th.sat{background:#2A8BD9;color:#fff}
+#print table.pc td{border:0.6pt solid #000;vertical-align:top;padding:0.5mm 0.7mm;height:24mm}
+#print table.pc td.hol .pd{background:#FBE1D5}
+#print .pd{font-size:8pt;margin-bottom:0.4mm}
+#print .pd small{font-size:7.5pt;margin-left:2mm}
+#print .pi{font-size:7.2pt;line-height:1.28;padding-left:15.5mm;text-indent:-15.5mm;word-break:break-all}
+#print .pi span{display:inline-block;min-width:15.5mm;padding-right:1mm;text-indent:0;white-space:nowrap;font-variant-numeric:tabular-nums}
 @media print{
   @page{size:A4 landscape;margin:7mm}
-  body{background:#fff;padding:0}
+  html,body{background:#fff !important;padding:0 !important;margin:0 !important}
   body > *:not(#print){display:none !important}
-  #print{display:block}
-  .pg{page-break-after:always;break-after:page;font-size:8.6pt;line-height:1.3;color:#000}
-  .pg:last-child{page-break-after:auto;break-after:auto}
-  .ph{display:flex;align-items:flex-end;margin-bottom:2mm}
-  .ph .t1{font-size:14pt;font-weight:700;text-decoration:underline}
-  .ph .t2{font-size:13pt;font-weight:700;margin-left:auto;margin-right:auto}
-  .ph .t3{font-size:8pt;text-align:right}
-  .pn{font-size:10pt;font-weight:700;margin-bottom:1.5mm}
-  table.pc{width:100%;border-collapse:collapse;table-layout:fixed}
-  table.pc th{border:0.6pt solid #000;font-weight:700;padding:0.6mm;font-size:9pt}
-  table.pc th.sun{background:#E8433A;color:#fff}table.pc th.sat{background:#2A8BD9;color:#fff}
-  table.pc td{border:0.6pt solid #000;vertical-align:top;padding:0.5mm 0.7mm;height:24mm}
-  table.pc td.hol .pd{background:#FBE1D5}
-  .pd{font-size:8pt;margin-bottom:0.4mm}
-  .pd small{font-size:7.5pt;margin-left:2mm}
-  .pi{font-size:7.2pt;line-height:1.28;padding-left:15.5mm;text-indent:-15.5mm;word-break:break-all}
-  .pi span{display:inline-block;width:15.5mm;text-indent:0;font-variant-numeric:tabular-nums}
+  #print{display:block !important;position:static !important}
+  #print .pg{page-break-after:always;break-after:page;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #print .pg:last-child{page-break-after:auto;break-after:auto}
 }
 </style>
 </head>
@@ -636,9 +639,28 @@ function pageHTML(k){
   while(col%7!==0){ h += '<td></td>'; col++; }
   return h + '</tr></table></div>';
 }
+function fitPages(){
+  // A4横（余白7mm）の高さに収まるまで縮める。縮めると横幅に余裕ができて折り返しが減るため、何度か測り直す
+  var box = document.getElementById("print");
+  var mm = 96/25.4, maxH = 190*mm;
+  box.classList.add("measure");
+  Array.prototype.forEach.call(box.querySelectorAll(".pg"), function(pg){
+    var fits = function(z){
+      pg.style.zoom = ""; pg.style.width = (283/z)+"mm";
+      return pg.getBoundingClientRect().height * z <= maxH;
+    };
+    if(fits(1)){ pg.style.width = ""; return; }
+    var lo = 0.4, hi = 1;
+    for(var i=0;i<8;i++){ var mid=(lo+hi)/2; if(fits(mid)) lo=mid; else hi=mid; }
+    pg.style.width = (283/lo)+"mm";
+    pg.style.zoom = lo;
+  });
+  box.classList.remove("measure");
+}
 function doPrint(keys){
   document.getElementById("print").innerHTML = keys.map(pageHTML).join("");
-  setTimeout(function(){ window.print(); }, 50);
+  var go = function(){ fitPages(); setTimeout(function(){ window.print(); }, 50); };
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(go); else go();
 }
 function printOne(){ doPrint([CUR]); }
 function printAll(){ doPrint(S.staff.map(function(x){ return x.k; })); }
